@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Nose-to-Tail - 3-Part Physically-Inspired SFX Generator</title>
+  <title>Physically-Inspired SFX Generator</title>
   <style>
     :root { color-scheme: dark; }
     body{ margin:0; font:14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0d10; color:#e7eef7; }
@@ -168,13 +168,13 @@ body{
   letter-spacing: .2px;
 }
 
-/* Kill softness */
+/* no softness */
 .panel, .ctrl, button, select, .meter, .flow, header, main, footer{
   border-radius:0 !important;
   box-shadow:none !important;
 }
 
-/* Brutal header: fixed, boxed */
+/* header */
 header{
   position:sticky;
   top:0;
@@ -191,7 +191,7 @@ h1{
 }
 .sub{ display:none; }
 
-/* Controls row becomes a brutal stack */
+/* Controls */
 header .row{
   gap:8px;
   align-items:stretch;
@@ -221,7 +221,7 @@ button:active{ transform:none; outline:3px solid #fff; outline-offset:2px; }
   background:#fff !important;
 }
 
-/* Layout: 4-column brutal grid */
+/* Layout: 4-column grid */
 main{
   padding:10px;
   display:grid;
@@ -247,7 +247,7 @@ main{
 .flow .arrow .line{ background:#fff; height:2px; }
 .flow .arrow .head{ border-left-color:#fff; }
 
-/* Panels live in the 4-col grid */
+/* Place panels in the 4 column grid */
 .grid{
   grid-column: 1 / -1;
   display:grid !important;
@@ -269,7 +269,7 @@ main{
 .tag{ display:none !important; }
 .panel::before{ display:none !important; }
 
-/* Controls become single column, large and legible */
+/* Controls become single column */
 .controls{
   display:grid !important;
   grid-template-columns: 1fr !important;
@@ -290,7 +290,7 @@ main{
   font-weight:800;
 }
 
-/* Brutal sliders: thick */
+/* thick sliders */
 input[type="range"]{
   width:100%;
   margin-top:10px;
@@ -325,11 +325,11 @@ input[type="range"]::-moz-range-thumb{
 /* Selects: full width */
 .panel select{ width:100% !important; }
 
-/* Remove subtle helper text to reduce clutter */
+/* Remove helper text to reduce clutter */
 .small{ display:none !important; }
 footer{ display:none; }
 
-/* Envelopes: make them brutal */
+/* Envelopes */
 .env{
   border:3px solid #fff !important;
   background:#000 !important;
@@ -387,7 +387,7 @@ header h1{
 
 
 
-/* Larger brutalist title */
+/* Larger title */
 header h1{
   font-size:22px !important;
   letter-spacing:2px !important;
@@ -395,7 +395,7 @@ header h1{
 
 
 
-/* EXTRA LARGE brutalist title */
+/* EXTRA LARGE title */
 header h1{
   font-size:32px !important;
   letter-spacing:3px !important;
@@ -404,7 +404,7 @@ header h1{
 
 
 
-/* Brutalist lock buttons */
+/* Lock buttons */
 #btnLockA, #btnLockB{
   text-transform:uppercase;
 }
@@ -435,7 +435,7 @@ header h1{
 
 
 
-/* De-emphasize GLOBAL panel */
+/* GLOBAL panel (greyer than the others) */
 .panel.panel-g{
   border-width:2px !important;
   border-style:dashed !important;
@@ -572,22 +572,22 @@ header h1{
   function makeSaturator(ctx, amount, oversample="4x"){
     const sh = ctx.createWaveShaper();
     sh.curve = makeDriveCurve(clamp(amount,0,1));
-    // Oversampling improves HF quality when nonlinear stages are inside the network.
+    // Oversampling nonlinear stages.
     try{ sh.oversample = oversample; } catch(e){ sh.oversample = "2x"; }
     return sh;
   }
 
 
-  // Tape-ish soft saturation: gentle asymmetric-ish tanh with HF rounding.
+  // Tape-ish soft saturation.
   function makeTapeCurve(amount){
     const n = 2048, curve = new Float32Array(n);
-    // intensity: 1..10 roughly
+    // intensity: 1..10 ish.
     const k = lerp(1.0, 10.0, clamp(amount,0,1));
-    const asym = lerp(0.0, 0.18, clamp(amount,0,1)); // slight asymmetry adds "tape-ish" character
+    const asym = lerp(0.0, 0.18, clamp(amount,0,1)); // slight asymmetry
     for(let i=0;i<n;i++){
       const x = (i/(n-1))*2 - 1;
       const xa = x + asym*x*x*x;
-      // softer than drive curve; preserves transients
+      // softer than drive curve to preserve transients
       curve[i] = Math.tanh(k*xa) / Math.tanh(k);
     }
     return curve;
@@ -618,8 +618,7 @@ header h1{
     return { input: pre, output: post, sh, lp, postGain: post.gain };
   }
 
-  // Stereo thickening echo with user control over delay time, feedback, and wet/dry mix.
-  // Designed to cover both Haas-thickening (5–35 ms) and audible echo (35–250 ms).
+  // Thickening echo with control over delay time, feedback, and wet/dry mix.
   function makeEcho(ctx, timeMs, feedback, mix){
     const input = ctx.createGain();
     const output = ctx.createGain();
@@ -627,7 +626,7 @@ header h1{
     const dry = ctx.createGain();
     const wet = ctx.createGain();
 
-    // Wet/dry crossfade (equal power-ish)
+    // Wet/dry crossfade (equal power)
     const m = clamp(mix,0,1);
     dry.gain.value = Math.cos(m * 0.5*Math.PI);
     wet.gain.value = Math.sin(m * 0.5*Math.PI);
@@ -649,15 +648,15 @@ header h1{
     fbL.gain.value = clamp(feedback, 0, 0.95);
     fbR.gain.value = clamp(feedback, 0, 0.95);
 
-    // Feedback loops
+    // Feedback
     dL.connect(fbL); fbL.connect(dL);
     dR.connect(fbR); fbR.connect(dR);
 
-    // Gentle damping in the feedback so it doesn't ring endlessly / alias
+    // Gentle damping in the feedback
     const fbLP_L = ctx.createBiquadFilter(); fbLP_L.type="lowpass"; fbLP_L.frequency.value = 5200;
     const fbLP_R = ctx.createBiquadFilter(); fbLP_R.type="lowpass"; fbLP_R.frequency.value = 5200;
 
-    // Route: input -> split -> delays -> merge -> wet
+    // Route: input => split => delays => merge => wet
     input.connect(dry); dry.connect(output);
 
     input.connect(split);
@@ -683,7 +682,7 @@ header h1{
     const prevAlpha  = ctx.globalAlpha;
     const prevLW     = ctx.lineWidth;
 
-    // subtle baseline
+    // baseline
     ctx.globalAlpha = 0.25;
     ctx.lineWidth = 1;
     ctx.strokeStyle = "#1b2430";
@@ -742,7 +741,7 @@ header h1{
     const w = canvas.width, h = canvas.height;
     const x = clamp(progress01, 0, 1) * w;
 
-    // Darken "future" portion so the played region reads clearly.
+    // Darken the "future" portion so the played region reads clearly.
     ctx.save();
     ctx.globalAlpha = 0.22;
     ctx.fillStyle = "#000";
@@ -816,7 +815,7 @@ function updateEnvA(){
 // ------------------- Surface definitions with modal stacks -------------------
   // partials: ratios relative to "modalBaseHz" (computed from B.baseHz and surface bias)
   // qs: per-partial Q values (narrower for glass/metal)
-  // gains: relative per-partial gains (shape the timbre)
+  // gains: relative per-partial gains (determine timbre)
   const surfaces = [
     { id:"wood", name:"Wood",
       // broad-ish low/mid modes (not harmonic)
@@ -1112,7 +1111,7 @@ lockA:false, lockB:false,
     const a=state.a;
     
 
-    // Juice macros (derived per-hit)
+    // Juice macros (derived per-hit) - not used at moment
     const j = state.juice;
     const e = impactEnergyFromState();
     updateJuiceMemory(e);
