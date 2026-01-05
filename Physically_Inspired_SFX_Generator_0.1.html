@@ -1,0 +1,2259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Nose-to-Tail - 3-Part Physically-Inspired SFX Generator</title>
+  <style>
+    :root { color-scheme: dark; }
+    body{ margin:0; font:14px/1.3 system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#0b0d10; color:#e7eef7; }
+    header{ padding:18px 16px 10px; border-bottom:1px solid #1b2430; display:flex; gap:12px; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; }
+    h1{ margin:0; font-size:16px; letter-spacing:.2px; }
+    .sub{ opacity:.75; font-size:12px; margin-top:4px; }
+    main{ padding:14px 16px 26px; display:grid; gap:14px; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    button{ background:#1a2635; border:1px solid #2b3a4f; color:#e7eef7; padding:8px 10px; border-radius:10px; cursor:pointer; }
+    button:hover{ background:#213246; }
+    button:active{ transform: translateY(1px); }
+    .grid{ display:grid; gap:14px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .panel{ border:1px solid #1b2430; border-radius:16px; padding:12px; background:linear-gradient(180deg,#0f141c,#0b0d10); box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .panel h2{ margin:0 0 10px; font-size:13px; letter-spacing:.2px; opacity:.95; }
+    .panel h2 span{ opacity:.7; font-weight:500; }
+    .controls{ display:grid; gap:10px; grid-template-columns: 1fr 1fr; }
+    .ctrl{ border:1px solid #17202b; border-radius:12px; padding:10px; background:#0d1219; }
+    .ctrl label{ display:flex; justify-content:space-between; gap:8px; font-size:12px; opacity:.9; }
+    .ctrl input[type="range"]{ width:100%; }
+    select{ width:100%; background:#0d1219; color:#e7eef7; border:1px solid #17202b; border-radius:10px; padding:8px; }
+    .small{ font-size:12px; opacity:.75; }
+    .meter{ height:10px; border-radius:999px; background:#101823; border:1px solid #17202b; overflow:hidden; width:220px; }
+    .meter > div{ height:100%; width:0%; background:linear-gradient(90deg,#3aa0ff,#92ffcf); transition: width .05s linear; }
+    footer{ padding:0 16px 20px; opacity:.7; font-size:12px; }
+    code{ background:#0d1219; padding:2px 6px; border-radius:8px; border:1px solid #17202b; }
+  
+    /* --- Concept color-coding + signal flow --- */
+    .panel-a{ border-color:#2b3a4f; box-shadow: 0 10px 30px rgba(0,0,0,.25), 0 0 0 1px rgba(58,160,255,.14), 0 0 22px rgba(58,160,255,.08); }
+    .panel-a::before{
+      content:"";
+      display:block;
+      height:3px;
+      border-radius:999px;
+      background:linear-gradient(90deg, rgba(58,160,255,.85), rgba(58,160,255,0));
+      margin:-2px 0 10px;
+    }
+
+    .panel-b{ border-color:#2b3a4f; box-shadow: 0 10px 30px rgba(0,0,0,.25), 0 0 0 1px rgba(146,255,207,.14), 0 0 22px rgba(146,255,207,.08); }
+    .panel-b::before{
+      content:"";
+      display:block;
+      height:3px;
+      border-radius:999px;
+      background:linear-gradient(90deg, rgba(146,255,207,.85), rgba(146,255,207,0));
+      margin:-2px 0 10px;
+    }
+
+    .panel-c{ border-color:#2b3a4f; box-shadow: 0 10px 30px rgba(0,0,0,.25), 0 0 0 1px rgba(255,170,86,.14), 0 0 22px rgba(255,170,86,.08); }
+    .panel-c::before{
+      content:"";
+      display:block;
+      height:3px;
+      border-radius:999px;
+      background:linear-gradient(90deg, rgba(255,170,86,.85), rgba(255,170,86,0));
+      margin:-2px 0 10px;
+    }
+
+    .panel-g{ border-color:#1b2430; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+    .tag{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      font-size:11px;
+      letter-spacing:.15px;
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid #17202b;
+      background:#0d1219;
+      margin-left:8px;
+      opacity:.92;
+      vertical-align:middle;
+    }
+    .tag i{
+      display:inline-block;
+      width:8px; height:8px;
+      border-radius:999px;
+    }
+    .tag-a i{ background:rgba(58,160,255,.95); }
+    .tag-b i{ background:rgba(146,255,207,.95); }
+    .tag-c i{ background:rgba(255,170,86,.95); }
+
+    .flow{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      padding:10px 12px;
+      border:1px solid #1b2430;
+      border-radius:14px;
+      background:linear-gradient(180deg,#0f141c,#0b0d10);
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    .flow .node{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid #17202b;
+      background:#0d1219;
+      font-size:12px;
+      opacity:.95;
+      white-space:nowrap;
+    }
+    .flow .dot{
+      width:10px; height:10px; border-radius:999px;
+    }
+    .flow .dot.a{ background:rgba(58,160,255,.95); }
+    .flow .dot.b{ background:rgba(146,255,207,.95); }
+    .flow .dot.c{ background:rgba(255,170,86,.95); }
+
+    .flow .arrow{
+      display:flex; align-items:center; gap:10px;
+      opacity:.8;
+    }
+    .flow .arrow .line{
+      width:34px; height:2px;
+      background:linear-gradient(90deg, rgba(231,238,247,.0), rgba(231,238,247,.55));
+      border-radius:999px;
+    }
+    .flow .arrow .head{
+      width:0; height:0;
+      border-top:6px solid transparent;
+      border-bottom:6px solid transparent;
+      border-left:9px solid rgba(231,238,247,.55);
+    }
+    @media (max-width: 820px){
+      .flow{ justify-content:flex-start; overflow:auto; }
+      .flow .arrow .line{ width:22px; }
+    }
+
+  /* Global panel differentiation */
+  .panel-g{
+    background: linear-gradient(180deg, rgba(60,90,120,0.18), rgba(40,60,85,0.14));
+    border-color: rgba(120,170,220,0.35);
+  }
+  .panel-g h2{
+    color: #b9d6ff;
+  }
+
+
+    .env{
+      width:100%;
+      height:60px;
+      background:#0b0d10;
+      border:1px solid #17202b;
+      border-radius:10px;
+      display:block;
+      margin:10px 0 8px;
+    }
+</style>
+
+<style id="brutalist-xtreme">
+:root { color-scheme: dark; }
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
+body{
+  margin:0;
+  background:#000;
+  color:#fff;
+  font: 15px/1.15 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+  letter-spacing: .2px;
+}
+
+/* Kill softness */
+.panel, .ctrl, button, select, .meter, .flow, header, main, footer{
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+
+/* Brutal header: fixed, boxed */
+header{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:#000;
+  border-bottom:4px solid #fff;
+  padding:10px 10px 8px;
+}
+h1{
+  font-size:14px;
+  margin:0;
+  text-transform:uppercase;
+  letter-spacing:1.2px;
+}
+.sub{ display:none; }
+
+/* Controls row becomes a brutal stack */
+header .row{
+  gap:8px;
+  align-items:stretch;
+ gap:6px; justify-content:flex-start;  justify-content:flex-start; }
+header .row > *{
+  margin:0;
+}
+button, select{
+  background:#000;
+  color:#fff;
+  border:3px solid #fff;
+  padding:10px 10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:1px;
+}
+button:hover, select:hover{ background:#0a0a0a; }
+button:active{ transform:none; outline:3px solid #fff; outline-offset:2px; }
+
+.meter{
+  height:14px;
+  width:240px;
+  border:3px solid #fff;
+  background:#000;
+}
+.meter > div{
+  background:#fff !important;
+}
+
+/* Layout: 4-column brutal grid */
+main{
+  padding:10px;
+  display:grid;
+  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  gap:10px;
+  align-items:start;
+}
+.flow{
+  grid-column: 1 / -1;
+  border:3px dashed #fff;
+  padding:10px;
+  margin:0;
+  background:#000;
+}
+.flow .node{
+  border:2px solid #fff;
+  background:#000;
+  padding:6px 10px;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:1px;
+}
+.flow .arrow .line{ background:#fff; height:2px; }
+.flow .arrow .head{ border-left-color:#fff; }
+
+/* Panels live in the 4-col grid */
+.grid{
+  grid-column: 1 / -1;
+  display:grid !important;
+  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  gap:10px !important;
+}
+.panel{
+  border:4px solid #fff !important;
+  background:#000 !important;
+  padding:10px !important;
+  margin:0 !important;
+}
+.panel h2{
+  margin:0 0 10px 0;
+  font-size:13px;
+  text-transform:uppercase;
+  letter-spacing:1.5px;
+}
+.tag{ display:none !important; }
+.panel::before{ display:none !important; }
+
+/* Controls become single column, large and legible */
+.controls{
+  display:grid !important;
+  grid-template-columns: 1fr !important;
+  gap:10px !important;
+}
+.ctrl{
+  border:2px solid #fff;
+  background:#000;
+  padding:10px;
+}
+.ctrl label{
+  font-size:12px;
+  text-transform:uppercase;
+  letter-spacing:1px;
+  opacity:1;
+}
+.ctrl label span:last-child{
+  font-weight:800;
+}
+
+/* Brutal sliders: thick */
+input[type="range"]{
+  width:100%;
+  margin-top:10px;
+  height:28px;
+  background:transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track{
+  height:10px;
+  background:#000;
+  border:2px solid #fff;
+}
+input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:18px;
+  height:26px;
+  background:#fff;
+  border:2px solid #000;
+  margin-top:-10px;
+}
+input[type="range"]::-moz-range-track{
+  height:10px;
+  background:#000;
+  border:2px solid #fff;
+}
+input[type="range"]::-moz-range-thumb{
+  width:18px;
+  height:26px;
+  background:#fff;
+  border:2px solid #000;
+}
+
+/* Selects: full width */
+.panel select{ width:100% !important; }
+
+/* Remove subtle helper text to reduce clutter */
+.small{ display:none !important; }
+footer{ display:none; }
+
+/* Envelopes: make them brutal */
+.env{
+  border:3px solid #fff !important;
+  background:#000 !important;
+  height:70px !important;
+}
+
+
+/* Responsive columns */
+@media (max-width: 1200px){
+  main{ grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+  .grid{ grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+}
+@media (max-width: 720px){
+  main{ grid-template-columns: 1fr; }
+  .grid{ grid-template-columns: 1fr; }
+}
+
+
+/* Header WAV tools: compact, inline */
+.wavtools{ display:flex; gap:8px; align-items:stretch; flex:0 0 auto; }
+#wavRate{
+  width:92px !important;
+  padding:6px 8px !important;
+  font-size:12px !important;
+  line-height:1 !important;
+}
+#btnSaveWav{
+  padding:6px 10px !important;
+  font-size:12px !important;
+  white-space:nowrap;
+}
+header .row{ flex-wrap:wrap; align-items:center;  justify-content:flex-start; }
+.meter{ flex:1 1 200px; min-width:180px; }
+
+
+
+/* Highlight WAV export controls */
+#wavRate,
+#btnSaveWav{
+  background:#ffd400 !important;
+  color:#000 !important;
+  border-color:#ffd400 !important;
+}
+#wavRate option{
+  background:#ffd400;
+  color:#000;
+}
+
+
+
+/* Yellow title text */
+header h1{
+  color:#ffd400 !important;
+}
+
+
+
+/* Larger brutalist title */
+header h1{
+  font-size:22px !important;
+  letter-spacing:2px !important;
+}
+
+
+
+/* EXTRA LARGE brutalist title */
+header h1{
+  font-size:32px !important;
+  letter-spacing:3px !important;
+  line-height:1.1 !important;
+}
+
+
+
+/* Brutalist lock buttons */
+#btnLockA, #btnLockB{
+  text-transform:uppercase;
+}
+#btnLockA.active, #btnLockB.active{
+  background:#ffd400 !important;
+  color:#000 !important;
+  border-color:#ffd400 !important;
+}
+
+/* Latching (depressed) lock buttons */
+#btnLockA.active, #btnLockB.active{
+  position:relative;
+  box-shadow: inset 0 0 0 3px #000, inset 0 0 0 6px #ffd400 !important;
+}
+#btnLockA.active::after, #btnLockB.active::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(135deg, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.00) 55%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,0.08) 0 6px, rgba(0,0,0,0.00) 6px 12px);
+  mix-blend-mode:multiply;
+}
+#btnLockA.active, #btnLockB.active{
+  transform: translateY(2px);
+}
+
+
+
+/* De-emphasize GLOBAL panel */
+.panel.panel-g{
+  border-width:2px !important;
+  border-style:dashed !important;
+  border-color:#666 !important;
+  background:#000 !important;
+}
+.panel.panel-g h2{
+  color:#bbb !important;
+  opacity:.85 !important;
+}
+.panel.panel-g .ctrl{
+  border-color:#666 !important;
+}
+.panel.panel-g .ctrl label{
+  opacity:.85 !important;
+}
+
+</style>
+
+</head>
+<body>
+<header>
+  <div>
+    <h1>Physically Inspired SFX Generator</h1>
+    </div>
+  <div class="row">
+    <button id="btnPlay">Play</button>
+    <button id="btnLockA">LOCK A</button>
+    <button id="btnLockB">LOCK B</button>
+
+    <button id="btnRand">Randomize</button>
+    <div class="wavtools" aria-label="WAV export controls"><select id="wavRate" title="WAV sample rate" style="width:auto; padding:8px 10px; border-radius:10px;" >
+      <option value="44100">44.1k</option>
+      <option value="48000">48k</option>
+    </select>
+    <button id="btnSaveWav" title="Render + download 16-bit WAV" >Save WAV</button>
+
+</div>
+</div>
+  </div>
+</header>
+
+<main>
+  
+  <div class="flow" aria-label="Signal flow: Contact to Material to Motion">
+    <div class="node"><span class="dot a"></span><b>Part A</b> Contact / Impact</div>
+    <div class="arrow"><span class="line"></span><span class="head"></span></div>
+    <div class="node"><span class="dot b"></span><b>Part B</b> Surface / Material</div>
+    <div class="arrow"><span class="line"></span><span class="head"></span></div>
+    <div class="node"><span class="dot c"></span><b>Part C</b> Body / Motion</div>
+  </div>
+
+<div class="grid"><section class="panel panel-a">
+      <h2>Part A <span>(Contact / Impact)</span><span class="tag tag-a"><i></i>Impulse</span></h2>
+      <div class="row">
+        <div style="flex:1; min-width: 240px;">
+          <select id="presetA"></select>
+          <div class="small" style="margin-top:6px;">Micro-burst + pitch drop + “dirt”.</div>
+        </div>
+      </div>
+            <canvas id="envA" width="280" height="60" class="env" aria-label="Impulse envelope"></canvas>
+      <div class="controls" id="controlsA"></div>
+    </section>
+
+    <section class="panel panel-b">
+      <h2>Part B <span>(Surface / Material)</span><span class="tag tag-b"><i></i>Structure</span></h2>
+      <div class="row">
+        <div style="flex:1; min-width: 240px;">
+          <select id="surface"></select>
+          <div class="small" style="margin-top:6px;">
+            Metal/Glass: multiple narrow resonances. Wood: lower broader modes. Soft: weak modes.
+          </div>
+        </div>
+      </div>
+      <div class="controls" id="controlsS"></div>
+    </section>
+
+    <section class="panel panel-c">
+      <h2>Part C <span>(Body / Motion)</span><span class="tag tag-c"><i></i>Motion</span></h2>
+      <div class="row">
+        <div style="flex:1; min-width: 240px;">
+          <select id="presetB"></select>
+          <div class="small" style="margin-top:6px;">Tone + noise excites the modal stack.</div>
+        </div>
+      </div>
+            <canvas id="envC" width="280" height="60" class="env" aria-label="Decay envelope"></canvas>
+      <div class="controls" id="controlsB"></div>
+    </section>
+
+    <section class="panel panel-g">
+      <h2>Global <span>(Space / Character)</span></h2>
+<div class="controls" id="controlsG"></div>
+      <div class="small" style="margin-top:8px;">
+        
+      </div>
+    </section></div>
+</main>
+
+<footer>
+  
+</footer>
+
+<script>
+(() => {
+  let ac=null, master=null, analyser=null;
+  const $ = (id)=>document.getElementById(id);
+  const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const dbToGain=(db)=>Math.pow(10,db/20);
+
+  function makeNoiseBuffer(ctx, seconds=1){
+    const len = Math.max(1, Math.floor(seconds * ctx.sampleRate));
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    let last=0;
+    for(let i=0;i<len;i++){
+      const w = Math.random()*2-1;
+      last = last*0.84 + w*0.16;
+      d[i] = (w*0.65 + last*0.35) * 0.22;
+    }
+    return buf;
+  }
+
+  function makeDriveCurve(amount){
+    const n=2048, curve=new Float32Array(n);
+    const a=lerp(1, 28, clamp(amount,0,1));
+    for(let i=0;i<n;i++){
+      const x=(i/(n-1))*2-1;
+      curve[i]=Math.tanh(a*x)/Math.tanh(a);
+    }
+    return curve;
+  }
+
+  function makeSaturator(ctx, amount, oversample="4x"){
+    const sh = ctx.createWaveShaper();
+    sh.curve = makeDriveCurve(clamp(amount,0,1));
+    // Oversampling improves HF quality when nonlinear stages are inside the network.
+    try{ sh.oversample = oversample; } catch(e){ sh.oversample = "2x"; }
+    return sh;
+  }
+
+
+  // Tape-ish soft saturation: gentle asymmetric-ish tanh with HF rounding.
+  function makeTapeCurve(amount){
+    const n = 2048, curve = new Float32Array(n);
+    // intensity: 1..10 roughly
+    const k = lerp(1.0, 10.0, clamp(amount,0,1));
+    const asym = lerp(0.0, 0.18, clamp(amount,0,1)); // slight asymmetry adds "tape-ish" character
+    for(let i=0;i<n;i++){
+      const x = (i/(n-1))*2 - 1;
+      const xa = x + asym*x*x*x;
+      // softer than drive curve; preserves transients
+      curve[i] = Math.tanh(k*xa) / Math.tanh(k);
+    }
+    return curve;
+  }
+
+  function makeTapeSat(ctx, amount){
+    const pre = ctx.createGain();
+    // push into shaper, then compensate slightly
+    const preGain = lerp(1.0, 2.4, clamp(amount,0,1));
+    pre.gain.value = preGain;
+
+    const sh = ctx.createWaveShaper();
+    sh.curve = makeTapeCurve(amount);
+    try{ sh.oversample = "4x"; }catch(e){ sh.oversample="2x"; }
+
+    const lp = ctx.createBiquadFilter();
+    lp.type="lowpass";
+    lp.frequency.value = lerp(18000, 8200, clamp(amount,0,1));
+    lp.Q.value = 0.7;
+
+    const post = ctx.createGain();
+    post.gain.value = lerp(1.0, 0.82, clamp(amount,0,1)); // keep headroom
+
+    pre.connect(sh);
+    sh.connect(lp);
+    lp.connect(post);
+
+    return { input: pre, output: post, sh, lp, postGain: post.gain };
+  }
+
+  // Stereo thickening echo with user control over delay time, feedback, and wet/dry mix.
+  // Designed to cover both Haas-thickening (5–35 ms) and audible echo (35–250 ms).
+  function makeEcho(ctx, timeMs, feedback, mix){
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+
+    const dry = ctx.createGain();
+    const wet = ctx.createGain();
+
+    // Wet/dry crossfade (equal power-ish)
+    const m = clamp(mix,0,1);
+    dry.gain.value = Math.cos(m * 0.5*Math.PI);
+    wet.gain.value = Math.sin(m * 0.5*Math.PI);
+
+    // Split to stereo, apply slightly different L/R times for width
+    const split = ctx.createChannelSplitter(2);
+    const merge = ctx.createChannelMerger(2);
+
+    const dL = ctx.createDelay(1.0);
+    const dR = ctx.createDelay(1.0);
+
+    // time (seconds)
+    const t = clamp(timeMs, 1, 1000) / 1000;
+    dL.delayTime.value = t;
+    dR.delayTime.value = clamp(t*1.11 + 0.002, 0.0, 1.0);
+
+    const fbL = ctx.createGain();
+    const fbR = ctx.createGain();
+    fbL.gain.value = clamp(feedback, 0, 0.95);
+    fbR.gain.value = clamp(feedback, 0, 0.95);
+
+    // Feedback loops
+    dL.connect(fbL); fbL.connect(dL);
+    dR.connect(fbR); fbR.connect(dR);
+
+    // Gentle damping in the feedback so it doesn't ring endlessly / alias
+    const fbLP_L = ctx.createBiquadFilter(); fbLP_L.type="lowpass"; fbLP_L.frequency.value = 5200;
+    const fbLP_R = ctx.createBiquadFilter(); fbLP_R.type="lowpass"; fbLP_R.frequency.value = 5200;
+
+    // Route: input -> split -> delays -> merge -> wet
+    input.connect(dry); dry.connect(output);
+
+    input.connect(split);
+    split.connect(dL, 0); split.connect(dR, 1);
+
+    dL.connect(fbLP_L); fbLP_L.connect(merge, 0, 0);
+    dR.connect(fbLP_R); fbLP_R.connect(merge, 0, 1);
+
+    merge.connect(wet);
+    wet.connect(output);
+
+    return { input, output, dL, dR, fbL, fbR, wetGain: wet.gain, dryGain: dry.gain };
+  }
+
+  // -------- Envelope visuals (A impulse, C decay) --------
+  function drawEnvelope(canvas, points){
+    if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+
+    const prevStroke = ctx.strokeStyle;
+    const prevAlpha  = ctx.globalAlpha;
+    const prevLW     = ctx.lineWidth;
+
+    // subtle baseline
+    ctx.globalAlpha = 0.25;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "#1b2430";
+    ctx.beginPath();
+    ctx.moveTo(0, h-1); ctx.lineTo(w, h-1);
+    ctx.stroke();
+
+    // envelope
+    ctx.globalAlpha = 1;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = prevStroke;
+    ctx.beginPath();
+    points.forEach((p,i)=>{
+      const x = Math.max(0, Math.min(1, p.t)) * w;
+      const y = h - (Math.max(0, Math.min(1, p.v)) * h);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+
+    ctx.strokeStyle = prevStroke;
+    ctx.globalAlpha = prevAlpha;
+    ctx.lineWidth   = prevLW;
+  }
+
+  
+  function envPointsA(){
+    const a = state.a;
+    const dur = Math.max(0.01, a.dur);
+    return [
+      {t:0.0, v:0.0},
+      {t:Math.min(0.02, 0.12*(0.045/dur)), v:1.0},
+      {t:0.18, v:0.38},
+      {t:1.0, v:0.0},
+    ];
+  }
+  function envPointsC(){
+    const b = state.b;
+    const dur = Math.max(0.05, b.dur);
+    const rise = Math.min(0.10, 0.01 + dur*0.03);
+    return [
+      {t:0.0, v:0.0},
+      {t:rise, v:1.0},
+      {t:0.35, v:0.72},
+      {t:0.70, v:0.26},
+      {t:1.0, v:0.0},
+    ];
+  }
+
+  function drawEnvelopeAnimated(canvas, points, progress01, strokeStyle){
+    if(!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if(!ctx) return;
+    ctx.strokeStyle = strokeStyle || ctx.strokeStyle;
+    drawEnvelope(canvas, points);
+
+    const w = canvas.width, h = canvas.height;
+    const x = clamp(progress01, 0, 1) * w;
+
+    // Darken "future" portion so the played region reads clearly.
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(x, 0, w - x, h);
+    ctx.restore();
+
+    // Playhead
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(231,238,247,.75)";
+    ctx.beginPath();
+    ctx.moveTo(x + 0.5, 0);
+    ctx.lineTo(x + 0.5, h);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  let _envAnimRAF = 0;
+  function animateEnvelopesOnPlay(t0, aEnd, cEnd){
+    if(!ac) return;
+    cancelAnimationFrame(_envAnimRAF);
+
+    const aPts = envPointsA();
+    const cPts = envPointsC();
+    const aDur = Math.max(0.0001, aEnd - t0);
+    const cDur = Math.max(0.0001, cEnd - t0);
+    const stopT = Math.max(aEnd, cEnd) + 0.05;
+
+    const cA = $("envA");
+    const cC = $("envC");
+
+    const step = ()=>{
+      if(!ac) return;
+      const now = ac.currentTime;
+
+      const aP = clamp((now - t0) / aDur, 0, 1);
+      const cP = clamp((now - t0) / cDur, 0, 1);
+
+      drawEnvelopeAnimated(cA, aPts, aP, "rgba(58,160,255,.95)");
+      drawEnvelopeAnimated(cC, cPts, cP, "rgba(255,170,86,.95)");
+
+      if(now < stopT){
+        _envAnimRAF = requestAnimationFrame(step);
+      }else{
+        // return to static display (latest parameter state)
+        updateEnvA();
+        updateEnvC();
+      }
+    };
+    _envAnimRAF = requestAnimationFrame(step);
+  }
+
+function updateEnvA(){
+    const pts = envPointsA();
+    const c = $("envA");
+    const ctx = c?.getContext?.("2d");
+    if(ctx){ ctx.strokeStyle = "rgba(58,160,255,.95)"; }
+    drawEnvelope(c, pts);
+    return pts;
+  }
+
+  function updateEnvC(){
+    const pts = envPointsC();
+    const c = $("envC");
+    const ctx = c?.getContext?.("2d");
+    if(ctx){ ctx.strokeStyle = "rgba(255,170,86,.95)"; }
+    drawEnvelope(c, pts);
+    return pts;
+  }
+// ------------------- Surface definitions with modal stacks -------------------
+  // partials: ratios relative to "modalBaseHz" (computed from B.baseHz and surface bias)
+  // qs: per-partial Q values (narrower for glass/metal)
+  // gains: relative per-partial gains (shape the timbre)
+  const surfaces = [
+    { id:"wood", name:"Wood",
+      // broad-ish low/mid modes (not harmonic)
+      modalRatios:[1.00, 1.43, 2.12, 2.96],
+      modalQs:    [3.0,  3.4,  3.8,  4.2],
+      modalGains: [1.00, 0.85, 0.55, 0.35],
+      baseBias: 0.95, // scales modal base
+      noiseHP: 90, noiseLP: 5200, tilt: -0.20,
+      raspRate: 22, raspAmt: 0.10
+    },
+    { id:"metal", name:"Metal",
+      // more partials, higher, narrower, clangy inharmonic
+      modalRatios:[1.00, 1.27, 1.61, 2.13, 2.74, 3.55],
+      modalQs:    [8.0,  10.0, 12.0, 14.0, 16.0, 18.0],
+      modalGains: [1.00, 0.78, 0.62, 0.52, 0.38, 0.28],
+      baseBias: 1.08,
+      noiseHP: 220, noiseLP: 8200, tilt: +0.20,
+      raspRate: 38, raspAmt: 0.05
+    },
+    { id:"glass", name:"Glass",
+      // very narrow, bright, “ping” like
+      modalRatios:[1.00, 1.33, 1.79, 2.41, 3.22, 4.10],
+      modalQs:    [14.0, 18.0, 22.0, 26.0, 28.0, 30.0],
+      modalGains: [1.00, 0.72, 0.55, 0.42, 0.30, 0.22],
+      baseBias: 1.18,
+      noiseHP: 380, noiseLP: 9500, tilt: +0.35,
+      raspRate: 28, raspAmt: 0.03
+    },
+    { id:"plastic", name:"Plastic",
+      // fewer, wider, slightly “hollow” mid focus
+      modalRatios:[1.00, 1.52, 2.05, 2.88],
+      modalQs:    [4.0,  4.6,  5.2,  5.8],
+      modalGains: [1.00, 0.70, 0.45, 0.30],
+      baseBias: 1.02,
+      noiseHP: 160, noiseLP: 7200, tilt: +0.05,
+      raspRate: 30, raspAmt: 0.08
+    },
+    { id:"stone", name:"Stone/Ceramic",
+      // firm, slightly bright, moderately narrow
+      modalRatios:[1.00, 1.41, 1.95, 2.62, 3.40],
+      modalQs:    [6.0,  7.5,  9.0,  10.0, 11.0],
+      modalGains: [1.00, 0.80, 0.55, 0.38, 0.28],
+      baseBias: 1.05,
+      noiseHP: 240, noiseLP: 8500, tilt: +0.12,
+      raspRate: 26, raspAmt: 0.06
+    },
+    { id:"cardboard", name:"Cardboard/Paper",
+      // very weak, broad “boxy” low modes
+      modalRatios:[1.00, 1.28, 1.62],
+      modalQs:    [1.4,  1.6,  1.8],
+      modalGains: [1.00, 0.55, 0.32],
+      baseBias: 0.85,
+      noiseHP: 70, noiseLP: 3600, tilt: -0.35,
+      raspRate: 18, raspAmt: 0.18
+    },
+    { id:"cloth", name:"Cloth/Soft",
+      // almost no resonance: very broad, tiny contribution
+      modalRatios:[1.00, 1.35],
+      modalQs:    [0.9,  1.0],
+      modalGains: [1.00, 0.45],
+      baseBias: 0.80,
+      noiseHP: 60, noiseLP: 2600, tilt: -0.55,
+      raspRate: 14, raspAmt: 0.22
+    },
+    { id:"gravel", name:"Gravel/Sand",
+      // resonance not dominant: a couple broad mid bands
+      modalRatios:[1.00, 1.55, 2.20],
+      modalQs:    [2.2,  2.4,  2.6],
+      modalGains: [1.00, 0.60, 0.40],
+      baseBias: 1.00,
+      noiseHP: 220, noiseLP: 7200, tilt: +0.10,
+      raspRate: 55, raspAmt: 0.35
+    },
+  ];
+  function surfaceById(id){ return surfaces.find(s=>s.id===id) || surfaces[0]; }
+
+  // ------------------- state -------------------
+  const state = {
+    
+  juice: { amount:0.35, comp:0.50, frag:0.20, memory:0.0 },
+lockA:false, lockB:false,
+    surface:{ id:"wood", amount:0.85, friction:0.65, brightness:0.55, modal:0.85 },
+    g:{ aMix:0.85, bMix:0.95, outDb:-8, pan:0, drive:0.12, tape:0.18, echoMs:35, echoFb:0.25, echoMix:0.12, room:0.12, size:0.35, duck:0.28 },
+    a:{ type:"tap_plastic", dur:0.045, click:0.35, grit:0.45, thump:0.35, pitchHz:260, pitchToHz:55, curve:0.65, hitHz:2200, hitQ:1.2, scatter:0.18 },
+    b:{ type:"wood_res", dur:0.65, tone:0.35, noise:0.38, baseHz:180, detune:10, filtMode:"bp", filtHz:1400, Q:1.4, wobRate:4.5, wobDepth:0.12, rasp:0.10 }
+  };
+
+  // ------------------- presets -------------------
+  const presetsA = [
+    {id:"tap_plastic", name:"Tap: Plastic", apply:(a)=>Object.assign(a,{ dur:0.035, click:0.55, grit:0.35, thump:0.15, pitchHz:420, pitchToHz:140, curve:0.8, hitHz:3800, hitQ:1.4, scatter:0.10 })},
+    {id:"knock_wood", name:"Knock: Wood", apply:(a)=>Object.assign(a,{ dur:0.055, click:0.20, grit:0.35, thump:0.55, pitchHz:230, pitchToHz:60, curve:0.65, hitHz:1800, hitQ:2.4, scatter:0.22 })},
+    {id:"hit_metal", name:"Hit: Metal", apply:(a)=>Object.assign(a,{ dur:0.04, click:0.30, grit:0.25, thump:0.25, pitchHz:520, pitchToHz:110, curve:0.78, hitHz:5200, hitQ:1.1, scatter:0.12 })},
+    {id:"drop_cardboard", name:"Drop: Cardboard", apply:(a)=>Object.assign(a,{ dur:0.07, click:0.18, grit:0.55, thump:0.65, pitchHz:170, pitchToHz:35, curve:0.55, hitHz:1200, hitQ:0.9, scatter:0.28 })},
+    {id:"stone_tick", name:"Stone Tick", apply:(a)=>Object.assign(a,{ dur:0.03, click:0.45, grit:0.30, thump:0.10, pitchHz:360, pitchToHz:180, curve:0.88, hitHz:3000, hitQ:2.0, scatter:0.08 })},
+    {id:"scrape_onset", name:"Scrape Onset", apply:(a)=>Object.assign(a,{ dur:0.09, click:0.12, grit:0.75, thump:0.25, pitchHz:140, pitchToHz:70, curve:0.5, hitHz:2600, hitQ:1.6, scatter:0.35 })}
+  ];
+  const presetsB = [
+    {id:"wood_res", name:"Body: Wooden Resonance", apply:(b)=>Object.assign(b,{ dur:0.75, tone:0.45, noise:0.18, baseHz:170, detune:14, filtMode:"bp", filtHz:1050, Q:2.1, wobRate:3.6, wobDepth:0.10, rasp:0.06 })},
+    {id:"metal_ring", name:"Body: Metal Ring", apply:(b)=>Object.assign(b,{ dur:1.15, tone:0.55, noise:0.08, baseHz:420, detune:22, filtMode:"bp", filtHz:2400, Q:3.2, wobRate:5.2, wobDepth:0.14, rasp:0.03 })},
+    {id:"glass_ping", name:"Body: Glass Ping", apply:(b)=>Object.assign(b,{ dur:0.9, tone:0.52, noise:0.06, baseHz:650, detune:18, filtMode:"bp", filtHz:3200, Q:4.2, wobRate:6.0, wobDepth:0.12, rasp:0.02 })},
+    {id:"cloth", name:"Body: Cloth / Soft", apply:(b)=>Object.assign(b,{ dur:0.6, tone:0.05, noise:0.55, baseHz:120, detune:8, filtMode:"lp", filtHz:1300, Q:0.8, wobRate:3.2, wobDepth:0.08, rasp:0.20 })},
+    {id:"whoosh_air", name:"Motion: Whoosh Air", apply:(b)=>Object.assign(b,{ dur:0.85, tone:0.05, noise:0.70, baseHz:90, detune:10, filtMode:"hp", filtHz:900, Q:0.9, wobRate:2.2, wobDepth:0.18, rasp:0.10 })},
+    {id:"gravel", name:"Motion: Gravel / Crunch", apply:(b)=>Object.assign(b,{ dur:0.7, tone:0.10, noise:0.62, baseHz:140, detune:10, filtMode:"bp", filtHz:1800, Q:1.2, wobRate:8.5, wobDepth:0.10, rasp:0.35 })}
+  ];
+
+  // ------------------- UI schema -------------------
+  const schemaS = [
+    {k:"amount", name:"Surface Amount", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"modal", name:"Modal Stack", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"friction", name:"Friction Emphasis", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"brightness", name:"Brightness Tilt", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)}
+  ];
+  const schemaA = [
+    {k:"dur", name:"A Length", min:0.01, max:0.14, step:0.001, fmt:v=>`${(v*1000|0)} ms`},
+    {k:"click", name:"Click", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"grit", name:"Grit", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"thump", name:"Thump", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"pitchHz", name:"Pitch Start", min:40, max:900, step:1, fmt:v=>`${v|0} Hz`},
+    {k:"pitchToHz", name:"Pitch End", min:20, max:500, step:1, fmt:v=>`${v|0} Hz`},
+    {k:"curve", name:"Pitch Curve", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"hitHz", name:"Bright Hz", min:300, max:8000, step:1, fmt:v=>`${v|0} Hz`},
+    {k:"hitQ", name:"Bright Q", min:0.2, max:10, step:0.1, fmt:v=>v.toFixed(1)},
+    {k:"scatter", name:"Scatter", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)}
+  ];
+  const schemaB = [
+    {k:"dur", name:"B Length", min:0.05, max:2.5, step:0.01, fmt:v=>`${v.toFixed(2)} s`},
+    {k:"tone", name:"Tone", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"noise", name:"Noise", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"baseHz", name:"Base Hz", min:40, max:1200, step:1, fmt:v=>`${v|0} Hz`},
+    {k:"detune", name:"Detune", min:0, max:50, step:1, fmt:v=>`${v|0}`},
+    {k:"wobRate", name:"Wobble Rate", min:0, max:18, step:0.1, fmt:v=>`${v.toFixed(1)} Hz`},
+    {k:"wobDepth", name:"Wobble Depth", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"rasp", name:"Rasp Amount", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)}
+  ];
+  const schemaG = [
+    {k:"aMix", name:"A Mix", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"bMix", name:"B Mix", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"duck", name:"Duck B by A", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"drive", name:"Drive", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"tape", name:"Tape Saturation", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"echoMs", name:"Echo Time", min:5, max:250, step:1, fmt:v=>`${v|0} ms`},
+    {k:"echoFb", name:"Echo Feedback", min:0, max:0.85, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"echoMix", name:"Echo Mix", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"room", name:"Room", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"size", name:"Room Size", min:0, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"pan", name:"Pan", min:-1, max:1, step:0.01, fmt:v=>v.toFixed(2)},
+    {k:"outDb", name:"Output dB", min:-30, max:0, step:1, fmt:v=>`${v|0} dB`}
+  ];
+
+  function buildSliders(container, obj, schema, onChange){
+    container.innerHTML="";
+    for(const s of schema){
+      const wrap=document.createElement("div"); wrap.className="ctrl";
+      const lab=document.createElement("label");
+      const l=document.createElement("span"); l.textContent=s.name;
+      const r=document.createElement("span"); r.textContent=s.fmt(obj[s.k]);
+      lab.appendChild(l); lab.appendChild(r);
+
+      const inp=document.createElement("input");
+      inp.type="range"; inp.min=s.min; inp.max=s.max; inp.step=s.step; inp.value=obj[s.k];
+      inp.addEventListener("input", ()=>{
+        obj[s.k] = (s.step % 1 === 0) ? parseInt(inp.value,10) : parseFloat(inp.value);
+        r.textContent = s.fmt(obj[s.k]);
+        onChange?.(s.k, obj[s.k]);
+      });
+
+      wrap.appendChild(lab); wrap.appendChild(inp);
+      container.appendChild(wrap);
+    }
+  }
+
+  async function initAudio(){
+    if(ac) return;
+    ac = new (window.AudioContext||window.webkitAudioContext)();
+
+    master = ac.createGain();
+    master.gain.value = dbToGain(state.g.outDb);
+
+    analyser = ac.createAnalyser();
+    analyser.fftSize = 1024;
+
+    master.connect(analyser);
+    analyser.connect(ac.destination);
+
+    const buf=new Float32Array(analyser.fftSize);
+    const fill=$("meterFill");
+    function meter(){
+      analyser.getFloatTimeDomainData(buf);
+      let sum=0;
+      for(let i=0;i<buf.length;i++) sum += buf[i]*buf[i];
+      const rms=Math.sqrt(sum/buf.length);
+      const pct=clamp(Math.pow(rms,0.6)*140,0,100);
+      fill.style.width=pct.toFixed(1)+"%";
+      requestAnimationFrame(meter);
+    }
+    meter();
+  }
+
+  function makeRoom(ctx){
+    const inG = ctx.createGain();
+    const outG = ctx.createGain();
+    const taps = [0.012,0.019,0.027,0.034,0.048];
+    const sum = ctx.createGain();
+    taps.forEach((t,i)=>{
+      const d = ctx.createDelay(0.2);
+      d.delayTime.value = t;
+      const g = ctx.createGain();
+      g.gain.value = 0.35 * (1 - i/taps.length);
+      inG.connect(d); d.connect(g); g.connect(sum);
+    });
+    const lp = ctx.createBiquadFilter();
+    lp.type="lowpass"; lp.frequency.value = 2200;
+    sum.connect(lp);
+    const mix = ctx.createGain(); mix.gain.value = 0;
+    const dry = ctx.createGain(); dry.gain.value = 1;
+    inG.connect(dry); dry.connect(outG);
+    lp.connect(mix); mix.connect(outG);
+    return { input: inG, output: outG, mixGain: mix.gain, lp: lp.frequency };
+  }
+
+  function makeFrictionChain(ctx, surface, friction, brightness){
+    const hp = ctx.createBiquadFilter();
+    hp.type="highpass"; hp.frequency.value = surface.noiseHP;
+
+    const low = ctx.createBiquadFilter();
+    low.type="lowshelf"; low.frequency.value = 220;
+
+    const high = ctx.createBiquadFilter();
+    high.type="highshelf"; high.frequency.value = 2800;
+
+    const tiltDb = (surface.tilt * 10) + (lerp(-6, +6, brightness));
+    low.gain.value  = -tiltDb;
+    high.gain.value = +tiltDb;
+
+    const lp = ctx.createBiquadFilter();
+    lp.type="lowpass"; lp.frequency.value = surface.noiseLP;
+
+    const grain = ctx.createBiquadFilter();
+    grain.type="bandpass";
+    grain.frequency.value = lerp(900, 3200, friction);
+    grain.Q.value = lerp(0.8, 2.5, friction);
+
+    const grainMix = ctx.createGain();
+    grainMix.gain.value = lerp(0.0, 0.6, friction);
+
+    const sum = ctx.createGain();
+    hp.connect(low); low.connect(high); high.connect(lp); lp.connect(sum);
+    hp.connect(grain); grain.connect(grainMix); grainMix.connect(sum);
+    return { input: hp, output: sum };
+  }
+
+  function makeModalStack(ctx, surface, modalBaseHz, modalAmount, wobRate, wobDepth){
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+    const n = surface.modalRatios.length;
+    const global = ctx.createGain();
+    global.gain.value = lerp(0.0, 1.0, modalAmount) * (1.2 / Math.sqrt(n));
+    global.connect(output);
+
+    const lfo = ctx.createOscillator();
+    lfo.type="sine";
+    lfo.frequency.value = wobRate;
+
+    const lfoAmt = ctx.createGain();
+    lfoAmt.gain.value = wobDepth * lerp(4, 28, clamp(modalAmount,0,1));
+    lfo.connect(lfoAmt);
+
+    const nodes = [];
+    for(let i=0;i<n;i++){
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      const f = modalBaseHz * surface.modalRatios[i];
+      bp.frequency.value = clamp(f, 60, 12000);
+      bp.Q.value = clamp(surface.modalQs[i], 0.5, 40);
+
+      const g = ctx.createGain();
+      const hfDamp = (bp.frequency.value > 6000) ? 0.75 : 1.0;
+      g.gain.value = surface.modalGains[i] * hfDamp;
+
+      input.connect(bp);
+      bp.connect(g);
+      g.connect(global);
+
+      lfoAmt.connect(bp.frequency);
+      nodes.push({bp,g});
+    }
+
+    lfo.start(ctx.currentTime);
+    return { input, output, lfo, nodes, global };
+  }
+
+  function scheduleA(t0, outBus){
+    const a=state.a;
+    
+
+    // Juice macros (derived per-hit)
+    const j = state.juice;
+    const e = impactEnergyFromState();
+    updateJuiceMemory(e);
+    const juice = j.amount;
+    const comp  = j.comp; // 0 soft .. 1 hard
+    const hSurf = hardnessBySurface(state.surface.id, comp);
+    const frag  = j.frag;
+
+    // Local (non-destructive) contact shaping
+    const aClick   = clamp(a.click  * lerp(0.30, 2.00, comp), 0, 1);
+    const aThump   = clamp(a.thump * lerp(1.70, 0.35, comp), 0, 1);
+    const aGrit    = clamp(a.grit  * lerp(0.95, 1.10, comp) * (1 + 0.60*juice), 0, 1);
+    const aScatter = clamp(a.scatter + 0.85*juice, 0, 1);
+    const aHitQ    = clamp(a.hitQ  * lerp(0.60, 1.60, comp), 0.1, 20);
+    const aCurve   = clamp(a.curve + (comp-0.5)*0.55, 0, 1);
+const s=surfaceById(state.surface.id);
+    const surfAmt = clamp(state.surface.amount,0,1);
+    const friction = clamp(state.surface.friction,0,1);
+    const bright = clamp(state.surface.brightness,0,1);
+
+    const dur=a.dur;
+
+    // Compliance spectral shaping (very audible): soft = darker, hard = brighter
+    const compLP = ac.createBiquadFilter();
+    compLP.type = "lowpass";
+    compLP.frequency.setValueAtTime(lerp(1800, 12000, hSurf), t0);
+    compLP.Q.setValueAtTime(0.8 + 0.8*hSurf, t0);
+
+    const end=t0+dur * lerp(1.15, 0.75, hardnessBySurface(state.surface.id, state.juice.comp));
+
+    
+    // Fragility: coherent "brittle" events on high energy hits
+    const trig = (frag > 0.001) && (e > lerp(0.78, 0.52, frag));
+    if(trig){
+      if(Math.random() < (0.22 + 0.45*frag)){
+        const dt = t0 + 0.015 + Math.random()*0.08;
+        const depth = lerp(0.15, 0.55, frag);
+        coupleVCA.gain.setValueAtTime(coupleVCA.gain.value, dt);
+        coupleVCA.gain.linearRampToValueAtTime(1.0 - depth, dt + 0.006);
+        coupleVCA.gain.linearRampToValueAtTime(1.0, dt + 0.060);
+      }
+      if(Math.random() < (0.18 + 0.40*frag)){
+        const crack = ac.createBufferSource();
+        crack.buffer = makeNoiseBuffer(ac, Math.max(0.08, b.dur*0.25));
+        const cg = ac.createGain();
+        const ct = t0 + 0.004 + Math.random()*0.05;
+        cg.gain.setValueAtTime(0.0001, ct);
+        cg.gain.linearRampToValueAtTime(lerp(0.06, 0.22, frag), ct + 0.004);
+        cg.gain.exponentialRampToValueAtTime(0.0001, ct + 0.060);
+
+        const cbp = ac.createBiquadFilter();
+        cbp.type="bandpass";
+        cbp.frequency.value = (s.id==="glass")?lerp(2800, 7000, Math.random()):lerp(900, 3600, Math.random());
+        cbp.Q.value = lerp(2.5, 8.0, frag);
+
+        crack.connect(cbp); cbp.connect(cg);
+        cg.connect(excite);
+        crack.start(ct); crack.stop(ct + 0.10);
+      }
+      if((s.id==="metal"||s.id==="glass") && Math.random() < (0.10 + 0.28*frag)){
+        const pt = t0 + 0.008 + Math.random()*0.04;
+        const po = ac.createOscillator();
+        po.type="sine";
+        po.frequency.setValueAtTime(lerp(1800, 7200, Math.random()), pt);
+        const pg = ac.createGain();
+        pg.gain.setValueAtTime(0.0001, pt);
+        pg.gain.linearRampToValueAtTime(lerp(0.03, 0.10, frag), pt + 0.004);
+        pg.gain.exponentialRampToValueAtTime(0.0001, pt + 0.14);
+        po.connect(pg);
+        pg.connect(stack.input);
+        po.start(pt); po.stop(pt + 0.16);
+      }
+    }
+
+
+    const bus=ac.createGain();
+    bus.gain.setValueAtTime(0.0001, t0);
+
+    const o=ac.createOscillator();
+    o.type="sine";
+    const pitchStart = a.pitchHz * lerp(1.0, (s.id==="metal"||s.id==="glass")?1.15:1.0, surfAmt*0.6);
+    const pitchEnd   = a.pitchToHz * lerp(1.0, (s.id==="cardboard"||s.id==="cloth")?0.85:1.0, surfAmt*0.6);
+    o.frequency.setValueAtTime(Math.max(1,pitchStart), t0);
+    const midT=lerp(t0+0.003, end, aCurve);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1, lerp(pitchStart,pitchEnd,0.35)), midT);
+    o.frequency.exponentialRampToValueAtTime(Math.max(1,pitchEnd), end);
+
+    const th=ac.createGain();
+    th.gain.setValueAtTime(0.0001, t0);
+    th.gain.linearRampToValueAtTime(aThump * lerp(1.15, 0.75, hSurf), t0+0.002);
+    th.gain.exponentialRampToValueAtTime(0.0001, end);
+    o.connect(th); th.connect(bus);
+
+    const nbuf=makeNoiseBuffer(ac, Math.max(0.3,dur));
+    const ns=ac.createBufferSource(); ns.buffer=nbuf;
+
+    const grit=ac.createGain();
+    grit.gain.setValueAtTime(0.0001, t0);
+    grit.gain.linearRampToValueAtTime(aGrit, t0+0.001);
+    grit.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    const fr = makeFrictionChain(ac, s, friction, bright);
+
+    const bp=ac.createBiquadFilter();
+    bp.type="bandpass";
+    const band = lerp(a.hitHz, (s.id==="wood")?1700:(s.id==="metal")?5200:(s.id==="glass")?4200:(s.id==="cardboard")?1200:2600, surfAmt);
+    const q    = lerp(aHitQ,  (s.id==="glass")?2.2:(s.id==="metal")?1.3:(s.id==="wood")?2.6:1.4, surfAmt);
+    bp.frequency.setValueAtTime(clamp(band*lerp(0.8,1.2,bright), 250, 9000), t0);
+    bp.Q.setValueAtTime(clamp(q,0.2,12), t0);
+
+    ns.connect(grit);
+    grit.connect(fr.input);
+    fr.output.connect(bp);
+    bp.connect(bus);
+
+    const click=ac.createGain();
+    click.gain.setValueAtTime(0.0001, t0);
+    click.gain.linearRampToValueAtTime(aClick * lerp(0.75, 1.45, hSurf), t0+0.0008);
+    click.gain.exponentialRampToValueAtTime(0.0001, t0+Math.min(0.02,dur));
+    const oc=ac.createOscillator();
+    oc.type="square";
+    oc.frequency.setValueAtTime( lerp(1800, 3200, (s.id==="glass"||s.id==="metal")?surfAmt:0.15 ), t0);
+    oc.connect(click);
+    click.connect(bp);
+
+    const scatterGain=ac.createGain();
+    scatterGain.gain.setValueAtTime(0, t0);
+    const hits = (aScatter>0) ? (1 + ((aScatter*6)|0)) : 0;
+    if(hits>0){
+      for(let i=0;i<hits;i++){
+        const st = t0 + Math.random()*dur*0.85;
+        const pk = aScatter * lerp(0.06, (s.id==="gravel")?0.65:0.40, Math.random());
+        scatterGain.gain.setValueAtTime(scatterGain.gain.value, st);
+        scatterGain.gain.linearRampToValueAtTime(pk, st+0.001);
+        scatterGain.gain.exponentialRampToValueAtTime(0.0001, st+0.02);
+      }
+    }
+    const ns2=ac.createBufferSource(); ns2.buffer=nbuf;
+    ns2.connect(scatterGain);
+    scatterGain.connect(fr.input);
+
+    bus.gain.linearRampToValueAtTime(1.0, t0+0.001);
+    bus.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    const satA = makeSaturator(ac, clamp(0.10 + state.g.drive*0.25 + state.surface.amount*0.12, 0, 1), "4x");
+    bus.connect(satA);
+
+    const mix=ac.createGain();
+    mix.gain.setValueAtTime(state.g.aMix, t0);
+    satA.connect(mix);
+    mix.connect(compLP);
+    compLP.connect(outBus);
+
+    o.start(t0); o.stop(end+0.03);
+    oc.start(t0); oc.stop(end+0.03);
+    ns.start(t0); ns.stop(end+0.03);
+    ns2.start(t0); ns2.stop(end+0.03);
+
+    return { endTime:end };
+  }
+
+  function scheduleB(t0, outBus, duckUntil){
+    const b=state.b;
+    
+
+    // Juice macros (derived per-hit)
+    const j = state.juice;
+    const e = impactEnergyFromState();
+    const juice = j.amount;
+    const comp  = j.comp;
+    const frag  = j.frag;
+const s=surfaceById(state.surface.id);
+
+    const surfAmt = clamp(state.surface.amount,0,1);
+    const friction = clamp(state.surface.friction,0,1);
+    const bright = clamp(state.surface.brightness,0,1);
+    const modalAmt = clamp(state.surface.modal,0,1) * surfAmt;
+
+    const dur=b.dur;
+    const end=t0+dur * lerp(1.15, 0.75, hardnessBySurface(state.surface.id, state.juice.comp));
+
+    const toneG=ac.createGain();
+    toneG.gain.setValueAtTime(clamp(b.tone,0,1), t0);
+
+    const o1=ac.createOscillator(), o2=ac.createOscillator();
+    o1.type="sine"; o2.type="sine";
+
+    const base = b.baseHz * s.baseBias * lerp(0.95, 1.15, (s.id==="glass"||s.id==="metal")?bright*0.6:bright*0.2);
+    o1.frequency.setValueAtTime(Math.max(1, base), t0);
+    o2.frequency.setValueAtTime(Math.max(1, base), t0);
+    o2.detune.setValueAtTime(b.detune, t0);
+
+    o1.connect(toneG); o2.connect(toneG);
+
+    const nbuf=makeNoiseBuffer(ac, Math.max(0.3,dur));
+    const ns=ac.createBufferSource(); ns.buffer=nbuf;
+
+    const noiseG=ac.createGain();
+    noiseG.gain.setValueAtTime(clamp(b.noise,0,1), t0);
+
+    const fr = makeFrictionChain(ac, s, friction, bright);
+    ns.connect(noiseG);
+    noiseG.connect(fr.input);
+
+    const raspLfo=ac.createOscillator();
+    raspLfo.type="square";
+    const raspRate = lerp(12, s.raspRate, clamp(b.rasp + friction*0.5, 0, 1));
+    raspLfo.frequency.setValueAtTime(raspRate, t0);
+
+    const raspAmt=ac.createGain();
+    raspAmt.gain.setValueAtTime(clamp(b.rasp*0.9 + s.raspAmt*surfAmt + friction*0.25 + 0.18*juice, 0, 1), t0);
+    raspAmt.gain.linearRampToValueAtTime(clamp(raspAmt.gain.value*lerp(1.0, 0.65, clamp(juice,0,1)), 0, 1), t0 + Math.min(1.2, b.dur*0.6));
+    raspLfo.connect(raspAmt);
+
+    const raspVCA=ac.createGain();
+    raspVCA.gain.setValueAtTime(1.0, t0);
+    raspAmt.connect(raspVCA.gain);
+
+    const excite = ac.createGain();
+    toneG.connect(excite);
+    fr.output.connect(raspVCA);
+    raspVCA.connect(excite);
+
+    const modalJit = (1.0 + (randn()*0.0015)*clamp(juice,0,1) + (randn()*0.0010)*clamp(j.memory,0,1));
+    const modalBaseHz = base * modalJit;
+    const stack = makeModalStack(ac, s, modalBaseHz, modalAmt, b.wobRate, b.wobDepth);
+    excite.connect(stack.input);
+
+
+    // Juice: pre-ring (tiny excitation slightly before the main body) for resonant surfaces
+    if(juice > 0.05 && (s.id==="metal"||s.id==="glass"||s.id==="wood")){
+      const prt = Math.max(0, t0 - lerp(0.0, 0.010, juice));
+      const pr = ac.createBufferSource();
+      pr.buffer = makeNoiseBuffer(ac, 0.12);
+      const prg = ac.createGain();
+      prg.gain.setValueAtTime(0.0001, prt);
+      prg.gain.linearRampToValueAtTime(lerp(0.0001, 0.26, juice) * lerp(0.6, 1.2, state.surface.modal), prt + 0.010);
+      prg.gain.exponentialRampToValueAtTime(0.0001, prt + 0.085);
+      const prbp = ac.createBiquadFilter();
+      prbp.type="bandpass";
+      prbp.frequency.value = (s.id==="glass")?3200:(s.id==="metal")?2400:1200;
+      prbp.Q.value = 2.2;
+      pr.connect(prbp); prbp.connect(prg); prg.connect(stack.input);
+      pr.start(prt); pr.stop(prt + 0.10);
+    }
+
+
+    
+
+    // Juice: inter-modal coupling proxy (slow AM) + calming settle
+    const couple = clamp(0.0 + 0.75*juice + 0.45*j.memory, 0, 1);
+    const beat = ac.createOscillator();
+    beat.type = "sine";
+    beat.frequency.value = lerp(0.25, 2.8, couple) + (Math.random()*0.20);
+    const beatAmt = ac.createGain();
+    beatAmt.gain.value = lerp(0.0, 1.35, couple) * ((s.id==="metal"||s.id==="glass")?1.15:0.85);
+    beat.connect(beatAmt);
+
+    const coupleVCA = ac.createGain();
+    coupleVCA.gain.value = 1.0;
+    beatAmt.connect(coupleVCA.gain);
+    beat.start(t0);
+
+    
+
+    // Fragility: coherent "brittle" events on high-energy hits (audible but not constant)
+    const trig = (frag > 0.001) && (e > lerp(0.80, 0.50, frag));
+    if(trig){
+      // brief dropout / slip
+      if(frag > 0.25){
+        const dt = t0 + 0.012 + Math.random()*0.09;
+        const depth = lerp(0.18, 0.62, frag);
+        coupleVCA.gain.setValueAtTime(coupleVCA.gain.value, dt);
+        coupleVCA.gain.linearRampToValueAtTime(1.0 - depth, dt + 0.006);
+        coupleVCA.gain.linearRampToValueAtTime(1.0, dt + 0.070);
+      }
+      // micro-crack noise burst
+      if(frag > 0.35){
+        const crack = ac.createBufferSource();
+        crack.buffer = makeNoiseBuffer(ac, Math.max(0.10, b.dur*0.30));
+        const cg = ac.createGain();
+        const ct = t0 + 0.003 + Math.random()*0.06;
+        cg.gain.setValueAtTime(0.0001, ct);
+        cg.gain.linearRampToValueAtTime(lerp(0.10, 0.40, frag), ct + 0.004);
+        cg.gain.exponentialRampToValueAtTime(0.0001, ct + 0.070);
+
+        const cbp = ac.createBiquadFilter();
+        cbp.type="bandpass";
+        cbp.frequency.value = (s.id==="glass")?lerp(3200, 8200, Math.random()):lerp(900, 4200, Math.random());
+        cbp.Q.value = lerp(2.8, 10.0, frag);
+
+        crack.connect(cbp); cbp.connect(cg);
+        cg.connect(excite);
+        crack.start(ct); crack.stop(ct + 0.12);
+      }
+      // brittle ping overtone on metal/glass
+      if((s.id==="metal"||s.id==="glass") && frag > 0.35){
+        const pt = t0 + 0.007 + Math.random()*0.05;
+        const po = ac.createOscillator();
+        po.type="sine";
+        po.frequency.setValueAtTime(lerp(2200, 9800, Math.random()), pt);
+        const pg = ac.createGain();
+        pg.gain.setValueAtTime(0.0001, pt);
+        pg.gain.linearRampToValueAtTime(lerp(0.04, 0.14, frag), pt + 0.004);
+        pg.gain.exponentialRampToValueAtTime(0.0001, pt + 0.16);
+        po.connect(pg);
+        pg.connect(stack.input);
+        po.start(pt); po.stop(pt + 0.18);
+      }
+    }
+
+const calm = clamp(0.12 + 0.30*juice, 0, 0.55);
+    coupleVCA.gain.setValueAtTime(1.0, t0);
+    coupleVCA.gain.linearRampToValueAtTime(1.0 - calm*0.15, t0 + Math.min(1.0, b.dur*0.5));
+const body = ac.createBiquadFilter();
+    const mode = (s.id==="cloth"||s.id==="cardboard") ? "lowpass" : "bandpass";
+    body.type = mode;
+    const bodyHz = clamp(lerp(900, 2800, bright) * ((s.id==="wood")?0.75:(s.id==="metal")?1.1:(s.id==="glass")?1.25:1.0), 120, 9000);
+    body.frequency.setValueAtTime(bodyHz, t0);
+    body.Q.setValueAtTime((mode==="bandpass") ? lerp(0.9, 2.2, surfAmt) : 0.7, t0);
+
+    const bodyMix = ac.createGain();
+    const bodyAmt = (s.id==="glass"||s.id==="metal") ? 0.18 : (s.id==="wood") ? 0.42 : (s.id==="cardboard"||s.id==="cloth") ? 0.35 : 0.28;
+    bodyMix.gain.setValueAtTime(bodyAmt * surfAmt, t0);
+
+    excite.connect(body);
+    body.connect(bodyMix);
+
+    const sum = ac.createGain();
+    stack.output.connect(coupleVCA);
+    coupleVCA.connect(sum);
+    bodyMix.connect(sum);
+
+    const env=ac.createGain();
+    env.gain.setValueAtTime(0.0001, t0);
+    env.gain.linearRampToValueAtTime(1.0, t0+0.01);
+    env.gain.exponentialRampToValueAtTime(0.0001, end);
+
+    if(duckUntil && state.g.duck>0){
+      const dip = lerp(1.0, 0.25, clamp(state.g.duck,0,1));
+      env.gain.setValueAtTime(env.gain.value, t0);
+      env.gain.linearRampToValueAtTime(dip, t0+0.006);
+      env.gain.linearRampToValueAtTime(1.0, duckUntil);
+      env.gain.exponentialRampToValueAtTime(0.0001, end);
+    }
+
+    const bus=ac.createGain();
+    bus.gain.setValueAtTime(1.0, t0);
+    const satC = makeSaturator(ac, clamp(0.08 + state.g.drive*0.22 + modalAmt*0.30 + (s.id==="metal"||s.id==="glass"?0.10:0.0), 0, 1), "4x");
+    sum.connect(satC);
+    // Frequency-dependent decay: highs damp faster than lows
+    const fd = ac.createBiquadFilter();
+    fd.type = "highshelf";
+    fd.frequency.setValueAtTime(lerp(1800, 4200, bright), t0);
+    fd.Q.setValueAtTime(0.7, t0);
+    const fdTarget = -lerp(4, 14, clamp(bright,0,1)) * lerp(0.75, 1.10, clamp(modalAmt,0,1));
+    fd.gain.setValueAtTime(0.0, t0);
+    fd.gain.linearRampToValueAtTime(fdTarget, end);
+    satC.connect(fd);
+    fd.connect(env);
+    env.connect(bus);
+
+    const mix=ac.createGain();
+    mix.gain.setValueAtTime(state.g.bMix, t0);
+    bus.connect(mix); mix.connect(outBus);
+
+    o1.start(t0); o2.start(t0);
+    o1.stop(end+0.06); o2.stop(end+0.06);
+
+    ns.start(t0); ns.stop(end+0.06);
+
+    raspLfo.start(t0); raspLfo.stop(end+0.06);
+    stack.lfo.stop(end+0.06);
+
+    setTimeout(()=>{
+      try{ excite.disconnect(); stack.input.disconnect(); stack.output.disconnect(); body.disconnect(); bodyMix.disconnect(); sum.disconnect(); }catch(e){}
+    }, (end - ac.currentTime)*1000 + 120);
+
+    return { endTime:end };
+  }
+
+  function playOnce(){
+    if(!ac) return;
+    // refresh envelope visuals on playback
+    updateEnvA();
+    updateEnvC();
+    const t0 = ac.currentTime + 0.02;
+
+    const outBus=ac.createGain();
+
+    const shaper=ac.createWaveShaper();
+    shaper.curve = makeDriveCurve(state.g.drive);
+    shaper.oversample="2x";
+
+    const pan=ac.createStereoPanner();
+    pan.pan.setValueAtTime(state.g.pan, t0);
+
+    const room = makeRoom(ac);
+    room.mixGain.setValueAtTime(state.g.room * 0.6, t0);
+    room.lp.setValueAtTime(lerp(1800, 5200, state.g.size), t0);
+
+    const tape = makeTapeSat(ac, state.g.tape);
+    const echo = makeEcho(ac, state.g.echoMs, state.g.echoFb, state.g.echoMix);
+
+    outBus.connect(tape.input);
+    tape.output.connect(echo.input);
+    echo.output.connect(shaper);
+    shaper.connect(room.input);
+    room.output.connect(pan);
+    pan.connect(master);
+
+    const A = scheduleA(t0, outBus);
+    const B = scheduleB(t0, outBus, A.endTime);
+    animateEnvelopesOnPlay(t0, A.endTime, B.endTime);
+
+    const stopAt = Math.max(A.endTime, t0 + state.b.dur) + 0.25;
+    outBus.gain.setValueAtTime(1.0, t0);
+    outBus.gain.setValueAtTime(0.0001, stopAt);
+
+    setTimeout(()=>{ try{ outBus.disconnect(); tape.input.disconnect(); tape.output.disconnect(); echo.input.disconnect(); echo.output.disconnect(); shaper.disconnect(); room.input.disconnect(); room.output.disconnect(); pan.disconnect(); }catch(e){} },
+      (stopAt - ac.currentTime)*1000 + 60
+    );
+  }
+
+  function pick(arr){ return arr[(Math.random()*arr.length)|0]; }
+  function randomize(){
+    if(Math.random()<0.35){
+      state.surface.id = pick(surfaces).id;
+      state.surface.amount = clamp(state.surface.amount + (Math.random()*0.4-0.2), 0,1);
+      state.surface.modal  = clamp(state.surface.modal  + (Math.random()*0.4-0.2), 0,1);
+      state.surface.friction = clamp(state.surface.friction + (Math.random()*0.4-0.2), 0,1);
+      state.surface.brightness = clamp(state.surface.brightness + (Math.random()*0.4-0.2), 0,1);
+    }
+    if(!state.lockA){
+      if(Math.random()<0.45){ const p=pick(presetsA); state.a.type=p.id; p.apply(state.a); }
+      else{
+        state.a.dur = clamp(state.a.dur * lerp(0.8,1.3,Math.random()), 0.01,0.14);
+        state.a.click = clamp(state.a.click + (Math.random()*0.4-0.2), 0,1);
+        state.a.grit  = clamp(state.a.grit  + (Math.random()*0.5-0.25),0,1);
+        state.a.thump = clamp(state.a.thump + (Math.random()*0.5-0.25),0,1);
+        state.a.pitchHz = clamp(state.a.pitchHz * lerp(0.75,1.45,Math.random()), 40,900);
+        state.a.pitchToHz = clamp(state.a.pitchToHz * lerp(0.75,1.55,Math.random()), 20,500);
+        state.a.hitHz = clamp(state.a.hitHz * lerp(0.6,1.7,Math.random()), 300,8000);
+        state.a.hitQ  = clamp(state.a.hitQ  * lerp(0.7,1.7,Math.random()), 0.2,10);
+        state.a.scatter = clamp(state.a.scatter + (Math.random()*0.4-0.2), 0,1);
+      }
+    }
+    if(!state.lockB){
+      if(Math.random()<0.45){ const p=pick(presetsB); state.b.type=p.id; p.apply(state.b); }
+      else{
+        state.b.dur = clamp(state.b.dur * lerp(0.8,1.5,Math.random()), 0.05,2.5);
+        state.b.tone = clamp(state.b.tone + (Math.random()*0.5-0.25),0,1);
+        state.b.noise= clamp(state.b.noise+ (Math.random()*0.5-0.25),0,1);
+        state.b.baseHz = clamp(state.b.baseHz * lerp(0.75,1.6,Math.random()), 40,1200);
+        state.b.detune = clamp(state.b.detune + (Math.random()*16-8), 0,50);
+        state.b.wobRate = clamp(state.b.wobRate * lerp(0.6,1.7,Math.random()), 0,18);
+        state.b.wobDepth= clamp(state.b.wobDepth + (Math.random()*0.25-0.12), 0,1);
+        state.b.rasp = clamp(state.b.rasp + (Math.random()*0.35-0.17), 0,1);
+      }
+    }
+    if(Math.random()<0.35){
+      state.g.drive = clamp(state.g.drive + (Math.random()*0.2-0.1), 0,1);
+      state.g.room  = clamp(state.g.room  + (Math.random()*0.25-0.12),0,1);
+      state.g.size  = clamp(state.g.size  + (Math.random()*0.25-0.12),0,1);
+      state.g.duck  = clamp(state.g.duck  + (Math.random()*0.25-0.12),0,1);
+    }
+    refreshUI();
+  }
+
+  const surfaceSel=$("surface");
+  surfaces.forEach(s=>{
+    const o=document.createElement("option");
+    o.value=s.id; o.textContent=s.name;
+    surfaceSel.appendChild(o);
+  });
+
+  const presetA=$("presetA"), presetB=$("presetB");
+  presetsA.forEach(p=>{ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name; presetA.appendChild(o); });
+  presetsB.forEach(p=>{ const o=document.createElement("option"); o.value=p.id; o.textContent=p.name; presetB.appendChild(o); });
+
+  function refreshUI(){
+    surfaceSel.value = state.surface.id;
+    presetA.value = state.a.type;
+    presetB.value = state.b.type;
+
+    buildSliders($("controlsS"), state.surface, schemaS);
+    buildSliders($("controlsA"), state.a, schemaA);
+    buildSliders($("controlsB"), state.b, schemaB);
+    buildSliders($("controlsG"), state.g, schemaG, (k,v)=>{
+      if(k==="outDb" && master) master.gain.value = dbToGain(state.g.outDb);
+    });
+    if(master) master.gain.value = dbToGain(state.g.outDb);
+
+    $("btnLockA").textContent = "LOCK A";
+    $("btnLockA").classList.toggle("active", !!state.lockA);
+$("btnLockB").textContent = "LOCK B";
+    $("btnLockB").classList.toggle("active", !!state.lockB);
+// envelope visuals
+    updateEnvA();
+    updateEnvC();
+
+  }
+
+  surfaceSel.addEventListener("change", ()=>{ state.surface.id = surfaceSel.value; refreshUI(); });
+
+  presetA.addEventListener("change", ()=>{
+    const p=presetsA.find(x=>x.id===presetA.value); if(!p) return;
+    state.a.type=p.id; p.apply(state.a); refreshUI();
+  });
+  presetB.addEventListener("change", ()=>{
+    const p=presetsB.find(x=>x.id===presetB.value); if(!p) return;
+    state.b.type=p.id; p.apply(state.b); refreshUI();
+  });
+
+  $("btnLockA").addEventListener("click", ()=>{ state.lockA=!state.lockA; refreshUI(); });
+  $("btnLockB").addEventListener("click", ()=>{ state.lockB=!state.lockB; refreshUI(); });
+  $("btnPlay").addEventListener("click", async ()=>{
+    await initAudio();
+    if(ac.state==="suspended") await ac.resume();
+    playOnce();
+  });
+
+  $("btnRand").addEventListener("click", ()=>randomize());
+
+  $("btnSaveWav").addEventListener("click", async ()=>{
+    await initAudio();
+    if(ac && ac.state==="suspended") await ac.resume();
+    await saveWav();
+  });
+
+
+  // -------- Juice layer (macros) --------
+  function impactEnergyFromState(){
+    const a = state.a;
+    const drop = clamp(Math.log2(Math.max(1, a.pitchHz) / Math.max(1, a.pitchToHz)) / 3.0, 0, 1);
+    const e = 0.35*clamp(a.thump,0,1) + 0.25*clamp(a.click,0,1) + 0.25*clamp(a.grit,0,1) + 0.15*clamp(a.scatter,0,1) + 0.20*drop;
+    return clamp(e, 0, 1);
+  }
+  function updateJuiceMemory(e){
+    const j = state.juice;
+    j.memory = lerp(j.memory, e, 0.25);
+  }
+  function randn(){
+    let u=0,v=0;
+    while(u===0) u=Math.random();
+    while(v===0) v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+  function clamp01(x){ return clamp(x,0,1); }
+
+  
+  
+
+  // Hardness perceptual curve differs by surface (material)
+  // h: 0..1 (soft->hard)  sId: "wood" | "metal" | "glass" | ...
+  function hardnessBySurface(sId, h){
+    h = clamp(h, 0, 1);
+    // Default: mild S-curve
+    let x = h*h*(3 - 2*h); // smoothstep
+    if(sId==="glass"){
+      // Glass feels "brittly stiff": low range feels similar, high end ramps fast
+      x = Math.pow(x, 1.8);
+    }else if(sId==="wood"){
+      // Wood compliance is more obvious early; hard end saturates
+      x = Math.pow(x, 0.75);
+    }else if(sId==="metal"){
+      // Metal is stiff across the range; bias upward slightly
+      x = clamp(0.08 + 0.94*Math.pow(x, 1.15), 0, 1);
+    }else if(sId==="stone" || sId==="ceramic"){
+      x = Math.pow(x, 1.5);
+    }
+    return clamp(x, 0, 1);
+  }
+
+  // -------- WAV export (16-bit PCM stereo) --------
+  function encodeWav16Stereo(L, R, sampleRate){
+    const n = Math.min(L.length, R.length);
+    const bytesPerSample = 2;
+    const blockAlign = 2 * bytesPerSample;
+    const byteRate = sampleRate * blockAlign;
+    const dataSize = n * blockAlign;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    function writeStr(off, s){ for(let i=0;i<s.length;i++) view.setUint8(off+i, s.charCodeAt(i)); }
+    function f32ToI16(x){
+      const v = Math.max(-1, Math.min(1, x));
+      return v < 0 ? Math.round(v * 32768) : Math.round(v * 32767);
+    }
+
+    writeStr(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeStr(8, "WAVE");
+
+    writeStr(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 2, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, byteRate, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, 16, true);
+
+    writeStr(36, "data");
+    view.setUint32(40, dataSize, true);
+
+    let o = 44;
+    for(let i=0;i<n;i++){
+      view.setInt16(o, f32ToI16(L[i]), true); o += 2;
+      view.setInt16(o, f32ToI16(R[i]), true); o += 2;
+    }
+    return buffer;
+  }
+
+  async function renderOfflineWav(sampleRate){
+    // Render a bit longer than the active sound to capture room tail.
+    const maxLen = Math.max(state.a.dur, state.b.dur);
+      // Tail guarantee: render generously (room + decay), then trim to last audible point (~-60 dB) + padding.
+      const tailPad = 0.25;
+      const roomExtra = 6.5 * clamp(state.g.room,0,1) * lerp(0.6, 1.2, clamp(state.g.size,0,1));
+      const totalSec = Math.min(12.0, maxLen + 1.6 + roomExtra);
+      const lengthFrames = Math.ceil(totalSec * sampleRate);
+    const ctx = new OfflineAudioContext(2, lengthFrames, sampleRate);
+
+    // Local helpers (mirror realtime versions, but using ctx)
+    const clampL=(v,a,b)=>Math.min(b,Math.max(a,v));
+    const lerpL=(a,b,t)=>a+(b-a)*t;
+    const dbToGainL=(db)=>Math.pow(10,db/20);
+
+    function makeNoiseBufferLocal(seconds=1){
+      const len = Math.max(1, Math.floor(seconds * ctx.sampleRate));
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0);
+      let last=0;
+      for(let i=0;i<len;i++){
+        const w = Math.random()*2-1;
+        last = last*0.84 + w*0.16;
+        d[i] = (w*0.65 + last*0.35) * 0.22;
+      }
+      return buf;
+    }
+
+    function makeDriveCurveLocal(amount){
+      const n=2048, curve=new Float32Array(n);
+      const a=lerpL(1, 28, clampL(amount,0,1));
+      for(let i=0;i<n;i++){
+        const x=(i/(n-1))*2-1;
+        curve[i]=Math.tanh(a*x)/Math.tanh(a);
+      }
+      return curve;
+    }
+
+      function makeSaturatorLocal(amount, oversample="4x"){
+        const sh = ctx.createWaveShaper();
+        sh.curve = makeDriveCurveLocal(clampL(amount,0,1));
+        try{ sh.oversample = oversample; } catch(e){ sh.oversample = "2x"; }
+        return sh;
+      }
+
+      function makeTapeCurveLocal(amount){
+        const n = 2048, curve = new Float32Array(n);
+        const k = lerpL(1.0, 10.0, clampL(amount,0,1));
+        const asym = lerpL(0.0, 0.18, clampL(amount,0,1));
+        for(let i=0;i<n;i++){
+          const x = (i/(n-1))*2 - 1;
+          const xa = x + asym*x*x*x;
+          curve[i] = Math.tanh(k*xa) / Math.tanh(k);
+        }
+        return curve;
+      }
+
+      function makeTapeSatLocal(amount){
+        const pre = ctx.createGain();
+        pre.gain.value = lerpL(1.0, 2.4, clampL(amount,0,1));
+
+        const sh = ctx.createWaveShaper();
+        sh.curve = makeTapeCurveLocal(amount);
+        try{ sh.oversample = "4x"; }catch(e){ sh.oversample="2x"; }
+
+        const lp = ctx.createBiquadFilter();
+        lp.type="lowpass";
+        lp.frequency.value = lerpL(12000, 5200, clampL(amount,0,1));
+        lp.Q.value = 0.6;
+
+        const post = ctx.createGain();
+        post.gain.value = lerpL(1.0, 0.78, clampL(amount,0,1));
+
+        pre.connect(sh); sh.connect(lp); lp.connect(post);
+        return { input: pre, output: post };
+      }
+
+      function makeEchoLocal(timeMs, feedback, mix){
+        const input = ctx.createGain();
+        const output = ctx.createGain();
+
+        const dry = ctx.createGain();
+        const wet = ctx.createGain();
+        const m = clampL(mix,0,1);
+        dry.gain.value = Math.cos(m * 0.5*Math.PI);
+        wet.gain.value = Math.sin(m * 0.5*Math.PI);
+
+        const split = ctx.createChannelSplitter(2);
+        const merge = ctx.createChannelMerger(2);
+
+        const dL = ctx.createDelay(1.0);
+        const dR = ctx.createDelay(1.0);
+
+        const t = clampL(timeMs, 1, 1000) / 1000;
+        dL.delayTime.value = t;
+        dR.delayTime.value = clampL(t*1.11 + 0.002, 0.0, 1.0);
+
+        const fbL = ctx.createGain(); fbL.gain.value = clampL(feedback, 0, 0.95);
+        const fbR = ctx.createGain(); fbR.gain.value = clampL(feedback, 0, 0.95);
+
+        dL.connect(fbL); fbL.connect(dL);
+        dR.connect(fbR); fbR.connect(dR);
+
+        const fbLP_L = ctx.createBiquadFilter(); fbLP_L.type="lowpass"; fbLP_L.frequency.value = 5200;
+        const fbLP_R = ctx.createBiquadFilter(); fbLP_R.type="lowpass"; fbLP_R.frequency.value = 5200;
+
+        input.connect(dry); dry.connect(output);
+
+        input.connect(split);
+        split.connect(dL, 0); split.connect(dR, 1);
+
+        dL.connect(fbLP_L); fbLP_L.connect(merge, 0, 0);
+        dR.connect(fbLP_R); fbLP_R.connect(merge, 0, 1);
+
+        merge.connect(wet); wet.connect(output);
+
+        return { input, output };
+      }
+
+function makeRoomLocal(){
+      const inG = ctx.createGain();
+      const outG = ctx.createGain();
+      const taps = [0.012,0.019,0.027,0.034,0.048];
+      const sum = ctx.createGain();
+      taps.forEach((t,i)=>{
+        const d = ctx.createDelay(0.2);
+        d.delayTime.value = t;
+        const g = ctx.createGain();
+        g.gain.value = 0.35 * (1 - i/taps.length);
+        inG.connect(d); d.connect(g); g.connect(sum);
+      });
+      const lp = ctx.createBiquadFilter();
+      lp.type="lowpass"; lp.frequency.value = 2200;
+      sum.connect(lp);
+      const mix = ctx.createGain(); mix.gain.value = 0;
+      const dry = ctx.createGain(); dry.gain.value = 1;
+      inG.connect(dry); dry.connect(outG);
+      lp.connect(mix); mix.connect(outG);
+      return { input: inG, output: outG, mixGain: mix.gain, lp: lp.frequency };
+    }
+
+    function makeFrictionChainLocal(surface, friction, brightness){
+      const hp = ctx.createBiquadFilter();
+      hp.type="highpass"; hp.frequency.value = surface.noiseHP;
+
+      const low = ctx.createBiquadFilter();
+      low.type="lowshelf"; low.frequency.value = 220;
+
+      const high = ctx.createBiquadFilter();
+      high.type="highshelf"; high.frequency.value = 2800;
+
+      const tiltDb = (surface.tilt * 10) + (lerpL(-6, +6, brightness));
+      low.gain.value  = -tiltDb;
+      high.gain.value = +tiltDb;
+
+      const lp = ctx.createBiquadFilter();
+      lp.type="lowpass"; lp.frequency.value = surface.noiseLP;
+
+      const grain = ctx.createBiquadFilter();
+      grain.type="bandpass";
+      grain.frequency.value = lerpL(900, 3200, friction);
+      grain.Q.value = lerpL(0.8, 2.5, friction);
+
+      const grainMix = ctx.createGain();
+      grainMix.gain.value = lerpL(0.0, 0.6, friction);
+
+      const sum = ctx.createGain();
+      hp.connect(low); low.connect(high); high.connect(lp); lp.connect(sum);
+      hp.connect(grain); grain.connect(grainMix); grainMix.connect(sum);
+      return { input: hp, output: sum };
+    }
+
+    function makeModalStackLocal(surface, modalBaseHz, modalAmount, wobRate, wobDepth){
+      const input = ctx.createGain();
+      const output = ctx.createGain();
+      const n = surface.modalRatios.length;
+      const global = ctx.createGain();
+      global.gain.value = lerpL(0.0, 1.0, modalAmount) * (1.2 / Math.sqrt(n));
+      global.connect(output);
+
+      const lfo = ctx.createOscillator();
+      lfo.type="sine";
+      lfo.frequency.value = wobRate;
+
+      const lfoAmt = ctx.createGain();
+      lfoAmt.gain.value = wobDepth * lerpL(4, 28, clampL(modalAmount,0,1));
+      lfo.connect(lfoAmt);
+
+      for(let i=0;i<n;i++){
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        const f = modalBaseHz * surface.modalRatios[i];
+        bp.frequency.value = clampL(f, 60, 12000);
+        bp.Q.value = clampL(surface.modalQs[i], 0.5, 40);
+
+        const g = ctx.createGain();
+        const hfDamp = (bp.frequency.value > 6000) ? 0.75 : 1.0;
+        g.gain.value = surface.modalGains[i] * hfDamp;
+
+        input.connect(bp);
+        bp.connect(g);
+        g.connect(global);
+
+        lfoAmt.connect(bp.frequency);
+      }
+      lfo.start(0);
+      return { input, output, lfo };
+    }
+
+    function scheduleA_off(t0, outBus){
+      const a=state.a;
+      const s=surfaceById(state.surface.id);
+      const surfAmt = clampL(state.surface.amount,0,1);
+      const friction = clampL(state.surface.friction,0,1);
+      const bright = clampL(state.surface.brightness,0,1);
+
+      const dur=a.dur;
+      const end=t0+dur * lerp(1.15, 0.75, hardnessBySurface(state.surface.id, state.juice.comp));
+
+      const bus=ctx.createGain();
+      bus.gain.setValueAtTime(0.0001, t0);
+
+      const o=ctx.createOscillator();
+      o.type="sine";
+      const pitchStart = a.pitchHz * lerpL(1.0, (s.id==="metal"||s.id==="glass")?1.15:1.0, surfAmt*0.6);
+      const pitchEnd   = a.pitchToHz * lerpL(1.0, (s.id==="cardboard"||s.id==="cloth")?0.85:1.0, surfAmt*0.6);
+      o.frequency.setValueAtTime(Math.max(1,pitchStart), t0);
+      const midT=lerpL(t0+0.003, end, a.curve);
+      o.frequency.exponentialRampToValueAtTime(Math.max(1, lerpL(pitchStart,pitchEnd,0.35)), midT);
+      o.frequency.exponentialRampToValueAtTime(Math.max(1,pitchEnd), end);
+
+      const th=ctx.createGain();
+      th.gain.setValueAtTime(0.0001, t0);
+      th.gain.linearRampToValueAtTime(a.thump, t0+0.002);
+      th.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(th); th.connect(bus);
+
+      const nbuf=makeNoiseBufferLocal(Math.max(0.3,dur));
+      const ns=ctx.createBufferSource(); ns.buffer=nbuf;
+
+      const grit=ctx.createGain();
+      grit.gain.setValueAtTime(0.0001, t0);
+      grit.gain.linearRampToValueAtTime(a.grit, t0+0.001);
+      grit.gain.exponentialRampToValueAtTime(0.0001, end);
+
+      const fr = makeFrictionChainLocal(s, friction, bright);
+
+      const bp=ctx.createBiquadFilter();
+      bp.type="bandpass";
+      const band = lerpL(a.hitHz, (s.id==="wood")?1700:(s.id==="metal")?5200:(s.id==="glass")?4200:(s.id==="cardboard")?1200:2600, surfAmt);
+      const q    = lerpL(a.hitQ,  (s.id==="glass")?2.2:(s.id==="metal")?1.3:(s.id==="wood")?2.6:1.4, surfAmt);
+      bp.frequency.setValueAtTime(clampL(band*lerpL(0.8,1.2,bright), 250, 9000), t0);
+      bp.Q.setValueAtTime(clampL(q,0.2,12), t0);
+
+      ns.connect(grit);
+      grit.connect(fr.input);
+      fr.output.connect(bp);
+      bp.connect(bus);
+
+      const click=ctx.createGain();
+      click.gain.setValueAtTime(0.0001, t0);
+      click.gain.linearRampToValueAtTime(a.click, t0+0.0008);
+      click.gain.exponentialRampToValueAtTime(0.0001, t0+Math.min(0.02,dur));
+      const oc=ctx.createOscillator();
+      oc.type="square";
+      oc.frequency.setValueAtTime( lerpL(1800, 3200, (s.id==="glass"||s.id==="metal")?surfAmt:0.15 ), t0);
+      oc.connect(click);
+      click.connect(bp);
+
+      const scatterGain=ctx.createGain();
+      scatterGain.gain.setValueAtTime(0, t0);
+      const hits = (a.scatter>0) ? (1 + ((a.scatter*6)|0)) : 0;
+      if(hits>0){
+        for(let i=0;i<hits;i++){
+          const st = t0 + Math.random()*dur*0.85;
+          const pk = a.scatter * lerpL(0.06, (s.id==="gravel")?0.65:0.40, Math.random());
+          scatterGain.gain.setValueAtTime(scatterGain.gain.value, st);
+          scatterGain.gain.linearRampToValueAtTime(pk, st+0.001);
+          scatterGain.gain.exponentialRampToValueAtTime(0.0001, st+0.02);
+        }
+      }
+      const ns2=ctx.createBufferSource(); ns2.buffer=nbuf;
+      ns2.connect(scatterGain);
+      scatterGain.connect(fr.input);
+
+      bus.gain.linearRampToValueAtTime(1.0, t0+0.001);
+      bus.gain.exponentialRampToValueAtTime(0.0001, end);
+
+      const satA = makeSaturatorLocal(clampL(0.10 + state.g.drive*0.25 + state.surface.amount*0.12, 0, 1), "4x");
+      bus.connect(satA);
+
+      const mix=ctx.createGain();
+      mix.gain.setValueAtTime(state.g.aMix, t0);
+      satA.connect(mix);
+    mix.connect(compLP);
+    compLP.connect(outBus);
+
+      o.start(t0); o.stop(end+0.03);
+      oc.start(t0); oc.stop(end+0.03);
+      ns.start(t0); ns.stop(end+0.03);
+      ns2.start(t0); ns2.stop(end+0.03);
+
+      return { endTime:end };
+    }
+
+    function scheduleB_off(t0, outBus, duckUntil){
+      const b=state.b;
+      const s=surfaceById(state.surface.id);
+
+      const surfAmt = clampL(state.surface.amount,0,1);
+      const friction = clampL(state.surface.friction,0,1);
+      const bright = clampL(state.surface.brightness,0,1);
+      const modalAmt = clampL(state.surface.modal,0,1) * surfAmt;
+
+      const dur=b.dur;
+      const end=t0+dur * lerp(1.15, 0.75, hardnessBySurface(state.surface.id, state.juice.comp));
+
+      const toneG=ctx.createGain();
+      toneG.gain.setValueAtTime(clampL(b.tone,0,1), t0);
+
+      const o1=ctx.createOscillator(), o2=ctx.createOscillator();
+      o1.type="sine"; o2.type="sine";
+
+      const base = b.baseHz * s.baseBias * lerpL(0.95, 1.15, (s.id==="glass"||s.id==="metal")?bright*0.6:bright*0.2);
+      o1.frequency.setValueAtTime(Math.max(1, base), t0);
+      o2.frequency.setValueAtTime(Math.max(1, base), t0);
+      o2.detune.setValueAtTime(b.detune, t0);
+
+      o1.connect(toneG); o2.connect(toneG);
+
+      const nbuf=makeNoiseBufferLocal(Math.max(0.3,dur));
+      const ns=ctx.createBufferSource(); ns.buffer=nbuf;
+
+      const noiseG=ctx.createGain();
+      noiseG.gain.setValueAtTime(clampL(b.noise,0,1), t0);
+
+      const fr = makeFrictionChainLocal(s, friction, bright);
+      ns.connect(noiseG);
+      noiseG.connect(fr.input);
+
+      const raspLfo=ctx.createOscillator();
+      raspLfo.type="square";
+      const raspRate = lerpL(12, s.raspRate, clampL(b.rasp + friction*0.5, 0, 1));
+      raspLfo.frequency.setValueAtTime(raspRate, t0);
+
+      const raspAmt=ctx.createGain();
+      raspAmt.gain.setValueAtTime(clampL(b.rasp*0.9 + s.raspAmt*surfAmt + friction*0.25, 0, 1), t0);
+      raspLfo.connect(raspAmt);
+
+      const raspVCA=ctx.createGain();
+      raspVCA.gain.setValueAtTime(1.0, t0);
+      raspAmt.connect(raspVCA.gain);
+
+      const excite = ctx.createGain();
+      toneG.connect(excite);
+      fr.output.connect(raspVCA);
+      raspVCA.connect(excite);
+
+      const modalBaseHz = base;
+      const stack = makeModalStackLocal(s, modalBaseHz, modalAmt, b.wobRate, b.wobDepth);
+      excite.connect(stack.input);
+
+      const body = ctx.createBiquadFilter();
+      const mode = (s.id==="cloth"||s.id==="cardboard") ? "lowpass" : "bandpass";
+      body.type = mode;
+      const bodyHz = clampL(lerpL(900, 2800, bright) * ((s.id==="wood")?0.75:(s.id==="metal")?1.1:(s.id==="glass")?1.25:1.0), 120, 9000);
+      body.frequency.setValueAtTime(bodyHz, t0);
+      body.Q.setValueAtTime((mode==="bandpass") ? lerpL(0.9, 2.2, surfAmt) : 0.7, t0);
+
+      const bodyMix = ctx.createGain();
+      const bodyAmt = (s.id==="glass"||s.id==="metal") ? 0.18 : (s.id==="wood") ? 0.42 : (s.id==="cardboard"||s.id==="cloth") ? 0.35 : 0.28;
+      bodyMix.gain.setValueAtTime(bodyAmt * surfAmt, t0);
+
+      excite.connect(body);
+      body.connect(bodyMix);
+
+      const sum = ctx.createGain();
+      stack.output.connect(sum);
+      bodyMix.connect(sum);
+
+      const env=ctx.createGain();
+      env.gain.setValueAtTime(0.0001, t0);
+      env.gain.linearRampToValueAtTime(1.0, t0+0.01);
+      env.gain.exponentialRampToValueAtTime(0.0001, end);
+
+      if(duckUntil && state.g.duck>0){
+        const dip = lerpL(1.0, 0.25, clampL(state.g.duck,0,1));
+        env.gain.setValueAtTime(env.gain.value, t0);
+        env.gain.linearRampToValueAtTime(dip, t0+0.006);
+        env.gain.linearRampToValueAtTime(1.0, duckUntil);
+        env.gain.exponentialRampToValueAtTime(0.0001, end);
+      }
+
+      const bus=ctx.createGain();
+      bus.gain.setValueAtTime(1.0, t0);
+        const satC = makeSaturatorLocal(clampL(0.08 + state.g.drive*0.22 + modalAmt*0.30 + ((s.id==="metal"||s.id==="glass")?0.10:0.0), 0, 1), "4x");
+        sum.connect(satC);
+        // Frequency-dependent decay: highs damp faster than lows
+        const fd = ctx.createBiquadFilter();
+        fd.type = "highshelf";
+        fd.frequency.setValueAtTime(lerpL(1800, 4200, bright), t0);
+        fd.Q.setValueAtTime(0.7, t0);
+        const fdTarget = -lerpL(4, 14, clampL(bright,0,1)) * lerpL(0.75, 1.10, clampL(modalAmt,0,1));
+        fd.gain.setValueAtTime(0.0, t0);
+        fd.gain.linearRampToValueAtTime(fdTarget, end);
+        satC.connect(fd);
+        fd.connect(env);
+      env.connect(bus);
+
+      const mix=ctx.createGain();
+      mix.gain.setValueAtTime(state.g.bMix, t0);
+      bus.connect(mix); mix.connect(outBus);
+
+      o1.start(t0); o2.start(t0);
+      o1.stop(end+0.06); o2.stop(end+0.06);
+      ns.start(t0); ns.stop(end+0.06);
+      raspLfo.start(t0); raspLfo.stop(end+0.06);
+      stack.lfo.stop(end+0.06);
+
+      return { endTime:end };
+    }
+
+    const master = ctx.createGain();
+    master.gain.value = dbToGainL(state.g.outDb);
+
+    const outBus = ctx.createGain();
+
+    const shaper = ctx.createWaveShaper();
+    shaper.curve = makeDriveCurveLocal(state.g.drive);
+    shaper.oversample = "2x";
+
+    const pan = ctx.createStereoPanner();
+    pan.pan.value = state.g.pan;
+
+    const room = makeRoomLocal();
+    room.mixGain.value = state.g.room * 0.6;
+    room.lp.value = lerpL(1800, 5200, state.g.size);
+
+    const tape = makeTapeSatLocal(state.g.tape);
+    const echo = makeEchoLocal(state.g.echoMs, state.g.echoFb, state.g.echoMix);
+
+    outBus.connect(tape.input);
+    tape.output.connect(echo.input);
+    echo.output.connect(shaper);
+    shaper.connect(room.input);
+    room.output.connect(pan);
+    pan.connect(master);
+    master.connect(ctx.destination);
+
+    const t0 = 0.02;
+    const A = scheduleA_off(t0, outBus);
+    scheduleB_off(t0, outBus, A.endTime);
+
+    const rendered = await ctx.startRendering();
+    const L = rendered.getChannelData(0);
+    const R = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : L;
+
+    // --- Tail trim: find last window whose RMS is above -60 dBFS, then keep a small pad ---
+      const thresh = 0.001; // ~ -60 dB
+      const win = 2048;
+      let last = Math.min(L.length, R.length) - 1;
+      // walk backwards in windows
+      for(let i = last - win; i >= 0; i -= win){
+        let sum=0;
+        for(let j=0;j<win;j++){
+          const x = 0.5*(L[i+j] + R[i+j]);
+          sum += x*x;
+        }
+        const rms = Math.sqrt(sum / win);
+        if(rms > thresh){
+          last = i + win;
+          break;
+        }
+      }
+      last = Math.min(last + Math.floor(tailPad * sampleRate), Math.min(L.length, R.length));
+      const Lt = L.subarray(0, last);
+      const Rt = R.subarray(0, last);
+
+      const wav = encodeWav16Stereo(Lt, Rt, sampleRate);
+      return { wav };
+  }
+
+  async function saveWav(){
+    const btn = $("btnSaveWav");
+    const prev = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try{
+      const sr = parseInt($("wavRate").value, 10) || 44100;
+      const { wav } = await renderOfflineWav(sr);
+      const blob = new Blob([wav], { type: "audio/wav" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const ts = new Date();
+      const pad = (n)=>String(n).padStart(2,"0");
+      const name = `two_part_sfx_${sr}Hz_${ts.getFullYear()}-${pad(ts.getMonth()+1)}-${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.wav`;
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 1200);
+    } catch(err){
+      console.error(err);
+      alert("Export failed: " + (err?.message || err));
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prev;
+    }
+  }
+
+  window.addEventListener("keydown", async (e)=>{
+    if(e.code==="Space"){
+      e.preventDefault();
+      await initAudio();
+      if(ac.state==="suspended") await ac.resume();
+      playOnce();
+    }
+    if(e.key==="r" || e.key==="R"){ randomize(); }
+  });
+
+  presetsA.find(p=>p.id===state.a.type)?.apply(state.a);
+  presetsB.find(p=>p.id===state.b.type)?.apply(state.b);
+  refreshUI();
+
+
+})();
+</script>
+</body>
+</html>
